@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -216,7 +216,10 @@ def run_tonghop(force: bool = False):
                     raw_data.extend(git_data)
         
         # Load saved state (chỉ lấy task trong ngày hiện tại)
-        saved_tasks = get_current_day_tasks()
+        if force:
+            saved_tasks = []
+        else:
+            saved_tasks = get_current_day_tasks()
         saved_tasks_file = os.path.join(BASE_DIR, "saved_raw_tasks.json")
 
         config = load_config()

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.4",
+  "version": "1.0.5",
   "released_at": "2026-06-10",
-  "changelog": "Cập nhật sửa đổi đồng bộ Git: hỗ trợ AI trích xuất task từ Git commits và sửa tên người gửi Git"
+  "changelog": "Bổ sung nút Quét lại từ đầu ngày (Force Sync) để quét lại toàn bộ tin nhắn/commit từ đầu ngày hôm nay"
 }

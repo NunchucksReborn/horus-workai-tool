@@ -683,6 +683,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Refresh Buttons Logic ---
+    const btnForceSync = document.getElementById('btn-force-sync');
+    if(btnForceSync) {
+        btnForceSync.addEventListener('click', () => {
+            if(confirm("Bạn có chắc chắn muốn xóa danh sách hiện tại và quét lại toàn bộ tin nhắn/commit từ đầu ngày hôm nay không?")) {
+                runTonghopFlow(true);
+            }
+        });
+    }
+
     const btnRefreshRaw = document.getElementById('btn-refresh-raw');
     const btnRefreshProcessed = document.getElementById('btn-refresh-processed');
     const btnRefreshKpi = document.getElementById('btn-refresh-kpi');
