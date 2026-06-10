@@ -1,5 +1,5 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "released_at": "2026-06-10",
-  "changelog": "Bổ sung nút Quét lại từ đầu ngày (Force Sync) để quét lại toàn bộ tin nhắn/commit từ đầu ngày hôm nay"
+  "changelog": "Khắc phục hoàn toàn lỗi giải mã ký tự có dấu (unicode/khoảng trắng) khi tự khởi động lại App trên Windows"
 }
