@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (async function checkForUpdates() {
         try {
             // Show current version
-            const verRes = await fetch('/api/version');
+            const verRes = await fetch('/api/version?t=' + Date.now());
             const verData = await verRes.json();
             const versionBadge = document.getElementById('app-version-badge');
             if (versionBadge && verData.version) {
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Check for update
-            const res = await fetch('/api/update/check');
+            const res = await fetch('/api/update/check?t=' + Date.now());
             const data = await res.json();
             if (data.has_update) {
                 const banner = document.getElementById('update-banner');

@@ -1,7 +1,7 @@
 import threading
 import uvicorn
 import webview
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -738,7 +738,8 @@ def test_workai(req: TestWorkAIRequest):
 # ============================================================
 
 @app.get("/api/version")
-def get_version():
+def get_version(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     local_ver = APP_VERSION
     try:
         import updater
@@ -748,7 +749,8 @@ def get_version():
     return {"version": local_ver}
 
 @app.get("/api/update/check")
-def check_for_update():
+def check_for_update(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     try:
         import updater
         current = updater.get_local_version(BASE_DIR) or APP_VERSION
