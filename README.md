@@ -1,87 +1,133 @@
-# Hướng dẫn sử dụng Athena Assistant (Rocket.Chat -> WorkAI Automation)
+# Athena Assistant - Tài liệu Dự án & Hướng dẫn Phát triển
 
-Athena Assistant là trợ lý ảo tự động hóa quy trình làm việc hàng ngày: Quét tin nhắn, email và lịch sử git commit của bạn, sử dụng trí tuệ nhân tạo (AI) để tổng hợp thành các đầu việc (Tasks) và tự động nhập chúng lên hệ thống quản lý công việc WorkAI.
+Athena Assistant là một ứng dụng Desktop WebUI (FastAPI + pywebview) giúp tự động hóa quy trình làm việc hàng ngày của Chu Văn Mai (PM & Team Lead): Quét tin nhắn, email và lịch sử git commit trong ngày, sử dụng AI để tổng hợp thành các đầu việc đạt chuẩn và tự động nhập chúng lên hệ thống quản lý công việc WorkAI bằng Playwright.
 
----
-
-## 📌 Các Tính Năng Chính
-1. **Đồng bộ hóa đa nền tảng**: Hỗ trợ quét tin nhắn từ **Rocket.Chat**, **Telegram**, **Slack**, đọc hộp thư **Email (IMAP)**, và lịch sử commit của các thư mục **Git (Local)**.
-2. **Tự động hóa bằng AI**: Sử dụng Gemini, DeepSeek, hoặc OpenAI để tóm tắt nội dung thô thành các task rõ ràng theo định dạng `[Hành động] - [Mục tiêu]`.
-3. **Quản lý & Tương tác thông minh**: Hỗ trợ chỉnh sửa nhanh, đổi dự án trực tiếp, hoặc chat trực tiếp với AI ở thanh bên để sửa đổi/tách nhỏ task hàng loạt.
-4. **Tự động nhập việc (Auto Submission)**: Sử dụng trình duyệt tự động (Playwright) đăng nhập vào WorkAI, tạo thẻ công việc và chuyển trạng thái sang **Done** chỉ với một cú click chuột.
+Tài liệu này được viết chi tiết nhằm giúp nhà phát triển tiếp theo tiếp quản, hiểu rõ kiến trúc, tính năng, quy trình build và các điểm kỹ thuật quan trọng của dự án.
 
 ---
 
-## 🚀 Hướng Dẫn Khởi Chạy
+## 📌 1. Kiến trúc Hệ thống & Danh sách Module
 
-Bạn có thể chạy ứng dụng theo 2 cách:
+Ứng dụng sử dụng mô hình lai giữa **Python Backend (FastAPI)** và **Desktop UI (pywebview)** để hiển thị một giao diện Web hiện đại, mượt mà dưới dạng ứng dụng Desktop chạy độc lập.
 
-### Cách 1: Sử dụng file chạy nhanh `main.exe` (Khuyến nghị cho người dùng cuối)
-1. Truy cập thư mục chứa file chạy: [dist/main.exe](file:///f:/prototype/Agent/dist/main.exe).
-2. Sao chép file `main.exe` vào một thư mục làm việc trống bất kỳ trên máy tính của bạn (Ví dụ: `D:\AthenaTool\`).
-3. Nhấp đúp chuột để chạy file `main.exe`. Giao diện WebUI sẽ tự động mở ra trên trình duyệt mặc định của bạn tại địa chỉ `http://127.0.0.1:5000`.
+```
+Athena.exe (Chứa Launcher + Python Runtime + default assets)
+     │
+     ├── Nạp động từ ổ đĩa (nếu có bản cập nhật)
+     ▼
+Thư mục gốc chạy ứng dụng:
+├── Athena.exe              <- Bộ chạy chính (không đổi)
+├── app_core.py             <- Backend FastAPI & logic chính (Cập nhật được)
+├── updater.py              <- Module xử lý cập nhật tự động (Cập nhật được)
+├── submitter.py            <- Kịch bản tự động nhập việc Playwright (Cập nhật được)
+├── ai_processor.py         <- Bộ xử lý Prompt & gọi API AI (Cập nhật được)
+├── sync_rocket.py          <- Đồng bộ tin nhắn từ Rocket.Chat (Cập nhật được)
+├── sync_git.py             <- Đồng bộ commit lịch sử Git local (Cập nhật được)
+├── sync_email.py           <- Đồng bộ email qua IMAP SSL (Cập nhật được)
+├── workai_scraper.py       <- Quét danh sách dự án/KPI từ WorkAI (Cập nhật được)
+├── version.json            <- Lưu thông tin phiên bản hiện tại trên đĩa
+├── static/                 <- Thư mục chứa giao diện HTML/CSS/JS (Cập nhật được)
+├── .env                    <- [BẢO MẬT] Cấu hình mật khẩu & Token (Không đưa lên Git)
+└── config.json             <- Cấu hình cài đặt của người dùng (Không đưa lên Git)
+```
 
-### Cách 2: Chạy từ mã nguồn Python
-Yêu cầu hệ thống đã cài đặt Python 3.10 trở lên.
-1. Cài đặt các thư viện cần thiết:
+### Chi tiết các Module chính:
+1. **`main.py` (Launcher)**: File entry-point duy nhất được đóng gói cứng trong `Athena.exe`. Nó không chứa logic nghiệp vụ mà chỉ làm nhiệm vụ khai báo thư mục làm việc vào đầu `sys.path` để ưu tiên nạp các file code bổ sung/cập nhật ngoài ổ đĩa trước khi import `app_core.py`.
+2. **`app_core.py` (Core)**: Khởi chạy server FastAPI chạy ngầm và tạo cửa sổ pywebview trỏ vào `http://127.0.0.1:8000/`. Chứa toàn bộ API endpoints điều khiển nghiệp vụ.
+3. **`updater.py` (Bộ cập nhật)**: Sử dụng các HTTP request trực tiếp gọi lên GitHub API để kiểm tra, tải mã nguồn và cập nhật ứng dụng.
+4. **`submitter.py` (WorkAI Submitter)**: Chạy một luồng Playwright Headless/Headful giả lập đăng nhập WorkAI để tự động thêm issue và chuyển trạng thái Done.
+5. **`ai_processor.py` (AI Engine)**: Xây dựng hệ thống prompt mẫu và kết nối API của Google Gemini, OpenAI, DeepSeek để tóm tắt chat, email thành task và sửa KPI.
+
+---
+
+## 🚀 2. Các Tính năng Nổi bật
+
+1. **Thu thập Dữ liệu Đa kênh**:
+   * **Rocket.Chat**: Quét các phòng chat, tin nhắn riêng (DM), các phòng thông báo/đơn từ. Tự động lấy tên hiển thị và username của người dùng đang đăng nhập qua API `/api/v1/me`. Hỗ trợ danh sách loại trừ (Blacklist) case-insensitive.
+   * **Email (IMAP SSL)**: Kết nối hòm thư cá nhân, tự động làm sạch nội dung HTML/CSS và gom nhóm email theo luồng (Thread Grouping) dựa trên tiêu đề chuẩn hóa.
+   * **Git (Local)**: Quét lịch sử commit của tác giả trong ngày trên các dự án code local.
+2. **Xử lý Thông tin bằng AI**:
+   * Tự động lọc nhiễu (chỉ giữ lại nội dung công việc liên quan tới user).
+   * Chuẩn hóa tiêu đề task theo công thức: `[Hành động] - [Mục tiêu]` với độ dài tối thiểu 50 ký tự.
+   * Hỗ trợ sửa đổi, chia nhỏ công việc hàng loạt qua khung chat AI thông minh ở thanh bên (sử dụng Patch/Full mode linh hoạt).
+   * Phân tích lý do KPI "Không đạt" để sửa tiêu đề chuẩn xác mà không bị phụ thuộc vào gợi ý sai lệch của hệ thống.
+3. **Tự động Nhập việc (Auto Submission)**:
+   * Playwright tự động đăng nhập, tạo thẻ công việc trực tiếp trên ngày hiện tại của Timesheet.
+   * Tự động phân tích tên dự án từ `projects.json` để chọn đúng option trong Combobox (shadcn Command), tự động gán vào Sprint mới nhất của dự án và chuyển trạng thái thẻ sang Done.
+4. **Tự động Cập nhật Không cần Git (Gitless Auto-Update)**:
+   * Cho phép máy nhân viên tự nâng cấp tính năng chỉ bằng một click chuột ngay trên giao diện mà không cần cài đặt Git hay Python trên máy tính.
+
+---
+
+## 🛠 3. Giải pháp Kỹ thuật Quan trọng cần Lưu ý
+
+### 3.1. Thiết kế Tách rời Launcher và Core để Cập nhật Trực tiếp
+Vì file `.exe` được build bằng PyInstaller là một file tĩnh đóng gói sẵn môi trường Python runtime (~476MB), việc phân phối lại file `.exe` mỗi khi sửa code là không khả thi.
+* **Giải pháp**: File `.exe` chỉ chạy launcher `main.py`. Khi người dùng click Cập nhật, ứng dụng tải gói ZIP mã nguồn từ GitHub (~100KB) và giải nén đè trực tiếp các file Python (`app_core.py`, `updater.py`...) ra thư mục chạy của người dùng.
+* Lệnh `sys.path.insert(0, RUNNING_DIR)` trong launcher sẽ khiến Python ưu tiên import các file code nằm ngoài đĩa cứng này trước code đóng gói sẵn trong exe.
+
+### 3.2. Bỏ qua Bộ nhớ đệm của GitHub Raw CDN (Fastly CDN Cache)
+Mã nguồn thô trên GitHub (`raw.githubusercontent.com`) sử dụng dịch vụ CDN Fastly để lưu đệm bộ nhớ trong **5 phút**. Nếu kiểm tra phiên bản trực tiếp bằng link tĩnh, người dùng sẽ không thấy bản cập nhật mới ngay lập tức.
+* **Giải pháp**: Trong `updater.py`, khi gọi API check version từ GitHub, hệ thống tự động nối thêm tham số timestamp:
+  `url = f"{VERSION_URL}?t={int(time.time())}"`
+  Điều này bắt buộc CDN phải bỏ qua cache và trả về file `version.json` mới nhất tức thì.
+
+### 3.3. Bỏ qua Cache Trình duyệt Webview
+Trình duyệt nhúng trên Windows (WebView2) lưu đệm (cache) tài nguyên API rất mạnh, khiến yêu cầu gọi `/api/update/check` luôn trả về kết quả cũ (báo không có cập nhật).
+* **Giải pháp**: 
+  1. Giao diện (JS) gọi URL check kèm timestamp: `/api/update/check?t=' + Date.now()`.
+  2. Backend FastAPI trả về response kèm HTTP Header cấm cache:
+     `response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"`
+
+### 3.4. Khởi động lại An toàn trên Windows (Tránh Errno 10048)
+Trên Windows, việc dùng `os.execv` để restart tiến trình sẽ khởi chạy tiến trình con trước khi giải phóng cổng mạng của tiến trình cha. Do đó tiến trình con sẽ bị crash do cổng `8000` đang bị chiếm giữ. Lệnh `timeout` của Windows cũng bị lỗi khi chạy trong môi trường ngầm (Input redirection not supported).
+* **Giải pháp**: Sử dụng lệnh `ping` kết hợp tắt tiến trình cha ngay lập tức bằng `os._exit(0)`:
+  `cmd = f'ping 127.0.0.1 -n 3 > nul & start "" "{exe_path}" {args_str}'`
+  Lệnh `ping` gửi 3 gói tin giúp trì hoãn chính xác 2 giây mà không cần tương tác console, tạo khoảng trống thời gian cho tiến trình cũ giải phóng hoàn toàn cổng `8000` trước khi tiến trình mới khởi động.
+
+---
+
+## 💻 4. Hướng dẫn Phát triển & Đóng gói (Developer Guide)
+
+### 4.1. Thiết lập Môi trường Phát triển
+1. Yêu cầu Python phiên bản `3.10` hoặc `3.12`.
+2. Cài đặt các thư viện cần thiết:
    ```bash
-   pip install fastapi uvicorn playwright jinja2 python-multipart pydantic
+   pip install fastapi uvicorn playwright pywebview python-multipart pydantic requests pyinstaller
    playwright install chromium
    ```
-2. Chạy ứng dụng:
+3. Chạy thử nghiệm ở chế độ phát triển:
    ```bash
    python main.py
    ```
-3. Mở trình duyệt truy cập `http://127.0.0.1:5000`.
+   *(Truy cập giao diện tại `http://127.0.0.1:8000`)*
+
+### 4.2. Quy trình Phát hành Bản Cập nhật Mới (Không cần Build lại EXE)
+Nếu anh chỉ sửa đổi logic code Python (không thêm thư viện mới) hoặc sửa giao diện HTML/CSS/JS:
+1. Mở file `version.json` ở thư mục gốc.
+2. Nâng số phiên bản (ví dụ từ `"1.0.3"` lên `"1.0.4"`).
+3. Cập nhật ngày phát hành (`released_at`) và mô tả thay đổi (`changelog`).
+4. Commit và push code lên GitHub:
+   ```bash
+   git add .
+   git commit -m "Phát hành bản cập nhật v1.0.4"
+   git push
+   ```
+   *Ngay lập tức, tất cả người dùng cuối sẽ thấy thông báo cập nhật mới v1.0.4 khi mở app.*
+
+### 4.3. Quy trình Đóng gói lại Bộ cài (`Athena.exe`)
+Chỉ thực hiện bước này khi **thêm thư viện Python mới** (bằng `pip install ...`) vào mã nguồn:
+1. Chạy lệnh build PyInstaller sử dụng file spec sẵn có:
+   ```bash
+   pyinstaller main.spec --noconfirm
+   ```
+2. Sau khi build xong, file `main.exe` mới sẽ được tạo trong thư mục `dist/`.
+3. Xóa file `dist/Athena.exe` cũ và đổi tên file `dist/main.exe` thành `Athena.exe`.
+4. Gửi file `Athena.exe` mới này cho người dùng cuối thay thế file cũ.
 
 ---
 
-## 🛠 Hướng Dẫn Sử Dụng Chi Tiết
-
-### Bước 1: Đăng nhập & Thiết lập ban đầu (Setup)
-*   **Tài khoản đăng nhập công cụ (mặc định):**
-    *   Tên đăng nhập: `admin`
-    *   Mật khẩu: `123456`
-*   **Thiết lập Thông tin cá nhân & AI:**
-    *   **Họ và tên / Vai trò:** Nhập đúng tên của bạn (Ví dụ: *Chu Văn Mai*) và vai trò (*Developer*). AI sẽ dựa vào thông tin này để lọc tin nhắn chỉ liên quan tới bạn.
-    *   **AI Provider & API Key:** Chọn nhà cung cấp AI mong muốn (Gemini, DeepSeek, OpenAI) và dán API Key tương ứng.
-    *   **Tài khoản WorkAI:** Điền email và mật khẩu đăng nhập trang WorkAI của bạn (mật khẩu này dùng cho script tự động tạo task).
-*   **Thiết lập các Nền tảng đồng bộ (Platforms):**
-    *   **Rocket.Chat**: Điền Server URL, User ID, và Auth Token của bạn.
-    *   **Email (IMAP)**: Nhập IMAP Server (VD: `imap.gmail.com` cho Gmail, `outlook.office365.com` cho Outlook) và địa chỉ email kèm **Mật khẩu ứng dụng** (App Password).
-    *   **Git (Local)**: Chọn thư mục code local và tên tác giả commit (VD: `Chu Văn Mai`) để quét lịch sử thay đổi code trong ngày.
-    *   **Telegram / Slack**: Điền các Chat ID, Token tương ứng (nếu cần quét).
-*   *Lưu ý:* Mọi thông tin cấu hình đều được lưu an toàn tại file cục bộ `config.json` và `.env` trong thư mục chạy của bạn.
-
----
-
-## 🔄 Quy Trình Làm Việc Hàng Ngày (Workflow)
-
-Quy trình làm việc hàng ngày gồm 3 bước chính tương ứng trên giao diện:
-
-### 1️⃣ Bước 1: Tổng hợp (Scan & Summarize)
-*   Bấm nút **1. Tổng hợp** trên giao diện chính.
-*   Hệ thống sẽ chạy các script ngầm để quét tin nhắn mới, email mới và git commit trong ngày (tính từ 0h sáng hôm nay, có kèm 2 phút bù đệm lệch giờ).
-*   AI sẽ tóm tắt tất cả các nội dung cào được và đề xuất danh sách task thô tại **Tab 1: Công việc thô (Chưa xử lý)**.
-
-### 2️⃣ Bước 2: Xem xét & Gán dự án (Review & Edit)
-*   **Gán dự án:** Tại danh sách công việc ở **Tab 1**, bạn cần chọn dự án (Project Code) tương ứng cho từng task từ menu dropdown. Hệ thống sẽ tự động lưu lại dự án bạn chọn.
-*   **Quản lý nhóm loại trừ (Blacklist):** Đối với Rocket.Chat, bạn có thể click nút **Quản lý Nhóm loại trừ** trong màn hình cài đặt để bỏ qua các phòng chat không liên quan (ví dụ phòng phiếm, tin tức chung).
-*   **Chỉnh sửa nhanh bằng AI Chat:**
-    *   Sử dụng thanh Chat ở bên phải màn hình để yêu cầu AI chỉnh sửa danh sách task.
-    *   *Ví dụ câu lệnh:* `"Xóa task số 3"`, `"Sửa nội dung task 1 thành nghiên cứu API"`, hoặc lệnh tách nhỏ phức tạp: `"Tách task số 1 thành 50 task nhỏ, mỗi task tương ứng 1 level từ 1 đến 50"`.
-    *   Hệ thống hỗ trợ tự động sửa lỗi và tách nhỏ với giới hạn đầu ra mở rộng lên tới 65,536 tokens.
-    *   Sau khi danh sách ở Tab 1 đã chuẩn, bấm nút **2. Tạo việc** để chuyển đổi toàn bộ danh sách sang **Tab 2: Bộ nhớ công việc (Đã xử lý)** dưới dạng tiêu đề đạt chuẩn WorkAI (`[Hành động] - [Mục tiêu]`, tối thiểu 50 ký tự) và lưu vào file `memorytask.md`.
-
-### 3️⃣ Bước 3: Nhập việc lên WorkAI (Auto Submit)
-*   Nhấp chọn **3. Nhập việc**.
-*   Một bảng overlay hiển thị tiến độ thời gian thực (Progress Bar) sẽ xuất hiện trên màn hình.
-*   Hệ thống sẽ chạy trình duyệt ảo Playwright đăng nhập trực tiếp vào tài khoản WorkAI của bạn, tự động tạo các Issue trong các dự án tương ứng, điền thông tin chi tiết và chuyển trạng thái thẻ từ **To Do** sang **Done**.
-*   **Lưu ý sau khi chạy:** Sau khi quá trình nhập việc hoàn tất, bạn cần truy cập thủ công vào trang WorkAI để tự căn chỉnh số giờ làm việc (allocated hours) cho từng task theo đúng thực tế công việc trong ngày của mình.
-
----
-
-## 🔒 Quy Tắc Bảo Mật & An Toàn Dữ Liệu
-*   Công cụ này hoạt động hoàn toàn **cục bộ (Local)** trên máy tính của bạn.
-*   Không có bất kỳ dữ liệu nhạy cảm nào (mật khẩu, API key, nội dung chat, email cá nhân) bị gửi ra ngoài ngoại trừ việc kết nối trực tiếp đến API của nhà cung cấp AI mà bạn cấu hình và trang WorkAI của công ty.
-*   Tuyệt đối **không chia sẻ** file cấu hình `.env` hoặc `config.json` cho người khác vì chúng chứa thông tin đăng nhập của bạn.
+## 🔒 5. Các Nguyên tắc Bảo mật & Dữ liệu
+* **Bảo vệ cấu hình cá nhân**: File `.gitignore` đã được cấu hình mặc định để **KHÔNG BAO GIỜ** đẩy các file chứa thông tin nhạy cảm của người dùng như `.env` (chứa password WorkAI, token Rocket.Chat) và `config.json` lên GitHub.
+* **Loại trừ dữ liệu khi cập nhật**: Module cập nhật trong `updater.py` đã cấu hình mảng `UPDATE_EXCLUDES` để bỏ qua các file cá nhân khi tải code mới từ GitHub về ghi đè. Không bao giờ ghi đè lên các file cấu hình và cơ sở dữ liệu Timesheet của người dùng cuối.
+* **Thư mục tài nguyên trình duyệt**: Thư mục cài đặt trình duyệt Playwright `ms-playwright` được giữ nguyên cục bộ để đảm bảo kịch bản tự động chạy offline không cần tải lại browser engine.

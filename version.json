@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "released_at": "2026-06-10",
-  "changelog": "Phiên bản v1.0.3 hỗ trợ tự cập nhật qua GitHub, sửa lỗi restart trên Windows"
+  "changelog": "Cập nhật sửa đổi đồng bộ Git: hỗ trợ AI trích xuất task từ Git commits và sửa tên người gửi Git"
 }

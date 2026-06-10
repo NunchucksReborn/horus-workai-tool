@@ -64,7 +64,7 @@ def main(last_sync_ms=None):
                         if c.startswith("Merge branch") or c.startswith("Merge pull request"):
                             continue
                         messages.append({
-                            "sender": "Git Push",
+                            "sender": f"Git Commit ({author})",
                             "text": c
                         })
                     
