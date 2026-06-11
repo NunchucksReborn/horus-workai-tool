@@ -1,5 +1,5 @@
 {
-  "version": "1.0.9",
+  "version": "1.0.10",
   "released_at": "2026-06-11",
-  "changelog": "Khắc phục triệt để lỗi AI Chat sửa nhầm công việc khi người dùng ẩn/xóa bớt task làm lệch số thứ tự trên màn hình hiển thị"
+  "changelog": "Khắc phục hoàn toàn lỗi tự động khởi động lại App sau khi cập nhật trên Windows bằng cách chỉ định rõ đường dẫn tương đối"
 }
