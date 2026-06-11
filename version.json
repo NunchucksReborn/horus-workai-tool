@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
-  "released_at": "2026-06-10",
-  "changelog": "Bổ sung bộ lọc nguồn dữ liệu (Rocket.Chat, Git, Email) dạng viên nhộng tại Tab 1 và Tab 2 giúp phân loại và quản lý công việc dễ dàng hơn"
+  "version": "1.0.9",
+  "released_at": "2026-06-11",
+  "changelog": "Khắc phục triệt để lỗi AI Chat sửa nhầm công việc khi người dùng ẩn/xóa bớt task làm lệch số thứ tự trên màn hình hiển thị"
 }

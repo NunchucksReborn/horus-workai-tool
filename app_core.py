@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.0.9"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -576,6 +576,8 @@ def run_nhapviec_status():
 class ChatRequest(BaseModel):
     message: str
     active_tab: str
+    raw_filter: str = "all"
+    processed_filter: str = "all"
 
 def try_repair_json(broken_json_str):
     """Cố gắng sửa chữa JSON bị cắt ngắn (truncated) từ AI.
@@ -628,6 +630,88 @@ def try_repair_json(broken_json_str):
     
     return None
 
+def get_raw_task_platform(task):
+    room_name = task.get("room_name") or ""
+    if room_name.startswith("Git -"):
+        return "git"
+    elif room_name.startswith("Email:"):
+        return "email"
+    return "rocket"
+
+def parse_memorytask_markdown(content: str):
+    lines = content.splitlines()
+    header_lines = []
+    tasks = []
+    current_task = None
+    
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## Task"):
+            if current_task:
+                tasks.append(current_task)
+            current_task = {
+                "project": "",
+                "platform": "rocket", # default
+                "title": "",
+                "raw_lines": [line]
+            }
+        elif current_task is not None:
+            current_task["raw_lines"].append(line)
+            if stripped.startswith("- **Project**:"):
+                current_task["project"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("- **Platform**:"):
+                current_task["platform"] = stripped.split(":", 1)[1].strip().lower()
+            elif stripped.startswith("- **Title**:"):
+                current_task["title"] = stripped.split(":", 1)[1].strip()
+        else:
+            header_lines.append(line)
+            
+    if current_task:
+        tasks.append(current_task)
+        
+    return header_lines, tasks
+
+def rebuild_memorytask_markdown(header_lines, tasks):
+    content = "\n".join(header_lines)
+    if not content.endswith("\n") and header_lines:
+        content += "\n"
+    if header_lines:
+        content += "\n"
+    for idx, task in enumerate(tasks):
+        task_header_written = False
+        for line in task["raw_lines"]:
+            if line.strip().startswith("## Task"):
+                content += f"## Task {idx + 1}\n"
+                task_header_written = True
+            else:
+                content += line + "\n"
+        if not task_header_written:
+            content += f"## Task {idx + 1}\n"
+            content += f"- **Project**: {task.get('project', '')}\n"
+            content += f"- **Platform**: {task.get('platform', 'rocket')}\n"
+            content += f"- **Title**: {task.get('title', '')}\n"
+        content += "\n"
+    return content.strip() + "\n"
+
+def merge_processed_tasks(original_tasks, updated_tasks, visible_indices):
+    new_tasks = list(original_tasks)
+    indices_to_remove = []
+    
+    for idx, orig_idx in enumerate(visible_indices):
+        if idx < len(updated_tasks):
+            new_tasks[orig_idx] = updated_tasks[idx]
+        else:
+            indices_to_remove.append(orig_idx)
+            
+    if len(updated_tasks) > len(visible_indices):
+        for idx in range(len(visible_indices), len(updated_tasks)):
+            new_tasks.append(updated_tasks[idx])
+            
+    for orig_idx in sorted(indices_to_remove, reverse=True):
+        new_tasks.pop(orig_idx)
+        
+    return new_tasks
+
 @app.post("/api/chat")
 def ai_chat(req: ChatRequest):
     config = load_config()
@@ -645,9 +729,27 @@ def ai_chat(req: ChatRequest):
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 
-            new_content = edit_task_with_ai(content, req.message, provider, api_key)
+            # Parse markdown and partition tasks based on platform filter
+            header_lines, all_tasks = parse_memorytask_markdown(content)
             
-            # Thử parse JSON
+            # Identify visible tasks matching processed_filter
+            processed_filter = req.processed_filter.lower()
+            visible_tasks = []
+            visible_indices = []
+            for idx, t in enumerate(all_tasks):
+                platform = t.get("platform", "rocket").lower()
+                if processed_filter == "all" or platform == processed_filter:
+                    visible_tasks.append(t)
+                    visible_indices.append(idx)
+                    
+            if not visible_tasks:
+                return {"reply": "Không tìm thấy công việc nào khớp với bộ lọc để gửi cho AI."}
+                
+            # Build markdown only containing visible tasks to send to AI
+            visible_content = rebuild_memorytask_markdown(header_lines, visible_tasks)
+            new_content = edit_task_with_ai(visible_content, req.message, provider, api_key)
+            
+            # Thử parse JSON từ AI phản hồi
             try:
                 parsed = json.loads(new_content)
                 updated_content = parsed.get("updated_content", "")
@@ -657,10 +759,20 @@ def ai_chat(req: ChatRequest):
                 updated_content = new_content
                 explanation = "Đã cập nhật lại nội dung ở Tab 2."
                 
+            # Parse the updated visible tasks markdown
+            _, updated_tasks = parse_memorytask_markdown(updated_content)
+            
+            # Merge updated tasks back into original tasks
+            merged_tasks = merge_processed_tasks(all_tasks, updated_tasks, visible_indices)
+            
+            # Reconstruct final markdown with original structure preserved
+            final_markdown = rebuild_memorytask_markdown(header_lines, merged_tasks)
+            
             with open(file_path, "w", encoding="utf-8") as f:
-                f.write(updated_content)
+                f.write(final_markdown)
                 
             return {"reply": explanation}
+            
         elif req.active_tab == "tab-raw":
             file_path = os.path.join(BASE_DIR, "saved_raw_tasks.json")
             if not os.path.exists(file_path):
@@ -668,7 +780,28 @@ def ai_chat(req: ChatRequest):
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 
-            new_content = edit_raw_tasks_with_ai(content, req.message, provider, api_key)
+            all_tasks = json.loads(content)
+            
+            # Separate visible tasks (active & match filter) vs other tasks (hidden or other platforms)
+            raw_filter = req.raw_filter.lower()
+            visible_tasks = []
+            other_tasks = []
+            for t in all_tasks:
+                if t.get("status") == "hide":
+                    other_tasks.append(t)
+                else:
+                    platform = get_raw_task_platform(t).lower()
+                    if raw_filter == "all" or platform == raw_filter:
+                        visible_tasks.append(t)
+                    else:
+                        other_tasks.append(t)
+                        
+            if not visible_tasks:
+                return {"reply": "Không tìm thấy công việc thô nào hiển thị khớp với bộ lọc để gửi cho AI."}
+                
+            # Send only visible tasks
+            visible_content_str = json.dumps(visible_tasks, ensure_ascii=False, indent=2)
+            new_content = edit_raw_tasks_with_ai(visible_content_str, req.message, provider, api_key)
             
             # Thử parse JSON
             try:
@@ -683,49 +816,105 @@ def ai_chat(req: ChatRequest):
             # Xử lý wrapper JSON
             explanation = "Đã cập nhật xong danh sách ở Tab 1."
             
+            import time
+            now_ms = int(time.time() * 1000)
+            
             if isinstance(parsed, dict):
                 explanation = parsed.get("explanation", explanation)
                 mode = parsed.get("mode", "full")
                 
-                import time
-                now_ms = int(time.time() * 1000)
-                
                 if mode == "patch" or "new_tasks" in parsed:
                     # CHẾ ĐỘ 2: Patch mode
-                    existing_tasks = json.loads(content)
-                    
-                    # Ẩn các task gốc
                     hide_ids = parsed.get("hide_ids", [])
-                    for t in existing_tasks:
+                    # Hide selected visible tasks
+                    for t in visible_tasks:
                         if t.get("id") in hide_ids:
                             t["status"] = "hide"
-                    
-                    # Thêm các task mới
+                            
+                    # Add new tasks
                     new_tasks = parsed.get("new_tasks", [])
                     for i, nt in enumerate(new_tasks):
                         nt["id"] = f"task_{now_ms}_{i}"
                         nt["status"] = "active"
-                        existing_tasks.append(nt)
-                    
+                        visible_tasks.append(nt)
+                        
+                    # Save visible + other tasks
+                    final_tasks = visible_tasks + other_tasks
                     with open(file_path, "w", encoding="utf-8") as f:
-                        json.dump(existing_tasks, f, ensure_ascii=False, indent=2)
+                        json.dump(final_tasks, f, ensure_ascii=False, indent=2)
                     return {"reply": explanation}
                 
                 else:
                     # CHẾ ĐỘ 1: Full tasks mode inside wrapper dict
                     updated_tasks = parsed.get("updated_tasks", [])
                     if not updated_tasks and "mode" in parsed:
-                        # Fallback nếu AI trả về key khác hoặc rỗng
                         updated_tasks = parsed.get("tasks", [])
+                        
+                    # Merge updated tasks by ID mapping
+                    updated_by_id = {t["id"]: t for t in updated_tasks if "id" in t}
+                    visible_ids = {t["id"] for t in visible_tasks if "id" in t}
+                    
+                    final_tasks = []
+                    new_added_tasks = []
+                    
+                    # Handle new tasks added in updated_tasks that don't have IDs
+                    for ut in updated_tasks:
+                        ut_id = ut.get("id")
+                        if not ut_id or ut_id not in visible_ids:
+                            if not ut_id:
+                                ut["id"] = f"task_{now_ms}_{len(new_added_tasks)}"
+                            ut["status"] = "active"
+                            new_added_tasks.append(ut)
+                            
+                    for t in all_tasks:
+                        t_id = t.get("id")
+                        if t_id in updated_by_id:
+                            final_tasks.append(updated_by_id[t_id])
+                        elif t_id in visible_ids:
+                            # This visible task was deleted by AI in full mode
+                            t["status"] = "hide"
+                            final_tasks.append(t)
+                        else:
+                            # Keep non-visible/hidden tasks as is
+                            final_tasks.append(t)
+                            
+                    final_tasks.extend(new_added_tasks)
                     
                     with open(file_path, "w", encoding="utf-8") as f:
-                        json.dump(updated_tasks, f, ensure_ascii=False, indent=2)
+                        json.dump(final_tasks, f, ensure_ascii=False, indent=2)
                     return {"reply": explanation}
             
             elif isinstance(parsed, list):
-                # Fallback nếu AI trả về mảng trực tiếp thay vì wrapper
+                # Fallback nếu AI trả về mảng trực tiếp thay vì wrapper (Chế độ 1)
+                updated_tasks = parsed
+                updated_by_id = {t["id"]: t for t in updated_tasks if "id" in t}
+                visible_ids = {t["id"] for t in visible_tasks if "id" in t}
+                
+                final_tasks = []
+                new_added_tasks = []
+                
+                for ut in updated_tasks:
+                    ut_id = ut.get("id")
+                    if not ut_id or ut_id not in visible_ids:
+                        if not ut_id:
+                            ut["id"] = f"task_{now_ms}_{len(new_added_tasks)}"
+                        ut["status"] = "active"
+                        new_added_tasks.append(ut)
+                        
+                for t in all_tasks:
+                    t_id = t.get("id")
+                    if t_id in updated_by_id:
+                        final_tasks.append(updated_by_id[t_id])
+                    elif t_id in visible_ids:
+                        t["status"] = "hide"
+                        final_tasks.append(t)
+                    else:
+                        final_tasks.append(t)
+                        
+                final_tasks.extend(new_added_tasks)
+                
                 with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(parsed, f, ensure_ascii=False, indent=2)
+                    json.dump(final_tasks, f, ensure_ascii=False, indent=2)
                 return {"reply": explanation}
             
             else:
@@ -735,6 +924,8 @@ def ai_chat(req: ChatRequest):
             return {"reply": "Tính năng sửa Tab này đang được phát triển."}
             
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"reply": f"Lỗi AI: {str(e)}"}
 
 class TestAIRequest(BaseModel):

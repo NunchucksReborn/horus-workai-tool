@@ -935,7 +935,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, active_tab: activeTab })
+                body: JSON.stringify({ 
+                    message: text, 
+                    active_tab: activeTab,
+                    raw_filter: currentRawFilter,
+                    processed_filter: currentProcessedFilter
+                })
             });
             const data = await res.json();
             
