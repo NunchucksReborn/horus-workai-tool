@@ -1,5 +1,5 @@
 {
-  "version": "1.0.11",
+  "version": "1.0.12",
   "released_at": "2026-06-11",
-  "changelog": "Khắc phục hoàn toàn lỗi lệch index khi chỉnh sửa task bằng AI chat bằng cách đồng bộ hóa danh sách task gửi đi với UI (sử dụng get_current_day_tasks)"
+  "changelog": "Khắc phục hoàn toàn lỗi lệch index bằng cách ép kiểu chuỗi cho ID nhận từ AI, đồng bộ timezone Việt Nam (UTC+7) cho nửa đêm và giải phóng port 8000 tránh tiến trình cũ chạy ngầm."
 }

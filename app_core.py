@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -99,9 +99,12 @@ def scan_projects():
 
 def get_current_day_tasks():
     import time
-    from datetime import datetime, time as datetime_time
-    today = datetime.now().date()
-    today_midnight = datetime.combine(today, datetime_time.min)
+    from datetime import datetime, timezone, timedelta
+    
+    # Bắt buộc tính theo múi giờ Việt Nam (UTC+7)
+    tz_vn = timezone(timedelta(hours=7))
+    now_vn = datetime.now(timezone.utc).astimezone(tz_vn)
+    today_midnight = now_vn.replace(hour=0, minute=0, second=0, microsecond=0)
     today_midnight_ms = int(today_midnight.timestamp() * 1000)
 
     saved_tasks_file = os.path.join(BASE_DIR, "saved_raw_tasks.json")
@@ -152,11 +155,13 @@ def run_tonghop(force: bool = False):
         raise HTTPException(status_code=409, detail="Tiến trình tổng hợp đang chạy, vui lòng đợi.")
     try:
         import time
-        from datetime import datetime, time as datetime_time
+        from datetime import datetime, timezone, timedelta
         
         now_ms = int(time.time() * 1000)
-        today = datetime.now().date()
-        today_midnight = datetime.combine(today, datetime_time.min)
+        # Bắt buộc tính theo múi giờ Việt Nam (UTC+7)
+        tz_vn = timezone(timedelta(hours=7))
+        now_vn = datetime.now(timezone.utc).astimezone(tz_vn)
+        today_midnight = now_vn.replace(hour=0, minute=0, second=0, microsecond=0)
         today_midnight_ms = int(today_midnight.timestamp() * 1000)
         
         last_sync_ms = today_midnight_ms
@@ -835,7 +840,7 @@ def ai_chat(req: ChatRequest):
                     # CHẾ ĐỘ 2: Patch mode
                     # Convert simple hide_ids back to original IDs
                     hide_simple_ids = parsed.get("hide_ids", [])
-                    hide_ids = [id_map_to_orig[sid] for sid in hide_simple_ids if sid in id_map_to_orig]
+                    hide_ids = [id_map_to_orig[str(sid)] for sid in hide_simple_ids if str(sid) in id_map_to_orig]
                     
                     # Hide selected visible tasks
                     for t in visible_tasks:
@@ -863,7 +868,7 @@ def ai_chat(req: ChatRequest):
                         
                     # Map simple IDs of updated_tasks back to original IDs
                     for ut in updated_tasks:
-                        simple_id = ut.get("id")
+                        simple_id = str(ut.get("id"))
                         if simple_id in id_map_to_orig:
                             ut["id"] = id_map_to_orig[simple_id]
                             
@@ -907,7 +912,7 @@ def ai_chat(req: ChatRequest):
                 
                 # Map simple IDs of updated_tasks back to original IDs
                 for ut in updated_tasks:
-                    simple_id = ut.get("id")
+                    simple_id = str(ut.get("id"))
                     if simple_id in id_map_to_orig:
                         ut["id"] = id_map_to_orig[simple_id]
                         
@@ -1031,6 +1036,24 @@ def apply_update_endpoint():
         return {"success": False, "message": str(e)}
 
 def run_server():
+    # Giải phóng port 8000 trên Windows nếu bị chiếm bởi tiến trình cũ chạy ngầm
+    try:
+        import subprocess
+        import os
+        port = 8000
+        if os.name == 'nt':
+            cmd = f'netstat -ano | findstr :{port}'
+            output = subprocess.check_output(cmd, shell=True).decode()
+            my_pid = os.getpid()
+            for line in output.splitlines():
+                if 'LISTENING' in line:
+                    parts = line.strip().split()
+                    pid = int(parts[-1])
+                    if pid != my_pid:
+                        subprocess.run(f"taskkill /F /PID {pid}", shell=True)
+    except Exception as e:
+        print("Lỗi giải phóng port 8000:", e)
+        
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
 
 def run(running_dir, app_version):
