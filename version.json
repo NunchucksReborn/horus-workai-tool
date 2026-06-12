@@ -1,5 +1,5 @@
 {
-  "version": "1.0.17",
+  "version": "1.0.18",
   "released_at": "2026-06-12",
-  "changelog": "Sửa lỗi không xóa cấu hình trong file .env khi ngắt kết nối nền tảng chat ở UI Setup, và xóa sạch cache thô chat_raw.json trước mỗi lần đồng bộ để tránh hiển thị tin nhắn cũ."
+  "changelog": "Thêm popup xác nhận trước khi nhập việc lên WorkAI và nút Hủy tiến trình trong overlay nhập việc; xác nhận hệ thống chống trùng lặp bằng dấu vân tay."
 }

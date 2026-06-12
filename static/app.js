@@ -638,14 +638,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Cancel button click event listener
+    const btnCancelNhapviec = document.getElementById('btn-cancel-nhapviec');
+    if (btnCancelNhapviec) {
+        btnCancelNhapviec.addEventListener('click', async () => {
+            if (confirm("Bạn có chắc chắn muốn hủy tiến trình nhập việc đang chạy? Các công việc đã nhập thành công sẽ được giữ nguyên.")) {
+                try {
+                    btnCancelNhapviec.disabled = true;
+                    btnCancelNhapviec.textContent = "Đang hủy...";
+                    const res = await fetch('/api/run/nhapviec/cancel', { method: 'POST' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        console.log(data.message);
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi gửi yêu cầu hủy:", err);
+                } finally {
+                    btnCancelNhapviec.disabled = false;
+                    btnCancelNhapviec.textContent = "Hủy tiến trình";
+                }
+            }
+        });
+    }
+
     document.getElementById('btn-tool-nhapviec').addEventListener('click', async () => {
+        // Confirmation before proceeding
+        if (!processedTasksContent || processedTasksContent.includes('Chưa có dữ liệu')) {
+            alert("Không có dữ liệu công việc đã tạo. Hãy bấm '2. Tạo việc' trước.");
+            return;
+        }
+
+        const proceed = confirm("Bạn có chắc chắn muốn nhập toàn bộ các công việc này lên WorkAI không?\n\n(Hệ thống sẽ tự động bỏ qua các công việc đã nhập trước đó để tránh trùng lặp)");
+        if (!proceed) return;
+
         const overlay = document.getElementById('progress-overlay');
         const fill = document.getElementById('progress-bar-fill');
         const percent = document.getElementById('progress-percent');
         const count = document.getElementById('progress-count');
         const msg = document.getElementById('progress-msg');
         
-        // Reset overlay
+        // Reset overlay and buttons
+        if (btnCancelNhapviec) {
+            btnCancelNhapviec.disabled = false;
+            btnCancelNhapviec.textContent = "Hủy tiến trình";
+        }
         fill.style.width = '0%';
         percent.textContent = '0%';
         count.textContent = '0/0';

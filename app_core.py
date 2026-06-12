@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.17"
+APP_VERSION = "1.0.18"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -513,31 +513,50 @@ def run_taoviec():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+submitter_process = None
+submitter_process_lock = threading.Lock()
+
 def run_submitter_process():
+    global submitter_process
     import subprocess
     import sys
     try:
         status_file = os.path.join(BASE_DIR, "submission_status.json")
-        result = subprocess.run([sys.executable, "submitter.py"], cwd=BASE_DIR, capture_output=True, text=True, encoding="utf-8")
-        if result.returncode != 0:
+        with submitter_process_lock:
+            submitter_process = subprocess.Popen(
+                [sys.executable, "submitter.py"],
+                cwd=BASE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8"
+            )
+        stdout, stderr = submitter_process.communicate()
+        returncode = submitter_process.returncode
+        with submitter_process_lock:
+            submitter_process = None
+            
+        if returncode != 0:
             # Check if it didn't write error status
             has_error = False
             if os.path.exists(status_file):
                 try:
                     with open(status_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                        if data.get("status") == "error":
+                        if data.get("status") in ("error", "cancelled"):
                             has_error = True
                 except:
                     pass
             if not has_error:
-                error_msg = result.stderr or result.stdout or "Lỗi không xác định"
+                error_msg = stderr or stdout or "Lỗi không xác định"
                 with open(status_file, "w", encoding="utf-8") as f:
                     json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi thực thi: {error_msg}"}, f, ensure_ascii=False, indent=2)
     except Exception as e:
         status_file = os.path.join(BASE_DIR, "submission_status.json")
         with open(status_file, "w", encoding="utf-8") as f:
             json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi khởi chạy: {str(e)}"}, f, ensure_ascii=False, indent=2)
+        with submitter_process_lock:
+            submitter_process = None
 
 @app.post("/api/run/nhapviec")
 def run_nhapviec():
@@ -600,6 +619,32 @@ def run_nhapviec_status():
         except Exception as e:
             return {"status": "error", "current": 0, "total": 0, "msg": f"Không thể đọc file trạng thái: {str(e)}"}
     return {"status": "idle", "current": 0, "total": 0, "msg": "Chưa chạy tiến trình nhập việc."}
+
+@app.post("/api/run/nhapviec/cancel")
+def cancel_nhapviec():
+    global submitter_process
+    with submitter_process_lock:
+        if submitter_process is not None:
+            try:
+                submitter_process.terminate()
+                submitter_process.wait(timeout=2)
+            except Exception:
+                try:
+                    submitter_process.kill()
+                except Exception:
+                    pass
+            submitter_process = None
+            
+            # Write status to cancelled
+            status_file = os.path.join(BASE_DIR, "submission_status.json")
+            try:
+                with open(status_file, "w", encoding="utf-8") as f:
+                    json.dump({"status": "error", "current": 0, "total": 0, "msg": "Tiến trình nhập việc đã bị hủy bỏ bởi người dùng."}, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+            return {"status": "success", "message": "Đã hủy tiến trình nhập việc."}
+        else:
+            return {"status": "error", "message": "Không có tiến trình nhập việc nào đang chạy."}
 
 class ChatRequest(BaseModel):
     message: str
