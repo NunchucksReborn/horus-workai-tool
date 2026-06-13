@@ -572,7 +572,7 @@ def process_task(page, task, col_index, idx, total):
         print(f"         ⚠ Status: {done_info}")
 
     print()
-    return True
+    return created_key
 
 
 
@@ -643,7 +643,7 @@ def main():
                 col_index = 1
             fp = task_fingerprint(task)
             try:
-                process_task(page, task, col_index, idx, total)
+                created_key = process_task(page, task, col_index, idx, total)
                 ok += 1
                 # Mark as submitted
                 submitted[fp] = {
@@ -651,6 +651,7 @@ def main():
                     "project": task.get("project", ""),
                     "date": task_date,
                     "submitted_at": _time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "issue_key": created_key,
                 }
                 save_submitted(submitted)
                 update_status("running", idx, total, f"Đã hoàn thành Task {idx}/{total}")

@@ -129,6 +129,7 @@
                 <button class="tab-btn active" data-tab="tab-raw">Nội dung thô</button>
                 <button class="tab-btn" data-tab="tab-processed">Nội dung sau khi Tạo việc</button>
                 <button class="tab-btn" data-tab="tab-suakpi">Sửa KPI</button>
+                <button class="tab-btn" data-tab="tab-preview">Xem & Sửa việc đã nhập</button>
             </div>
             
             <div class="tab-content active" id="tab-raw">
@@ -168,6 +169,16 @@
                 <div id="kpi-tasks-container">
                     <!-- JS render kpi tasks here -->
                     <div class="empty-state">Chưa có dữ liệu. Hãy bấm "4. Sửa KPI".</div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-preview">
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px;">
+                    <button id="btn-scan-preview" class="btn outline" style="width: auto; padding: 6px 12px; font-size: 0.85rem; border-color: var(--accent); color: var(--accent);">🔄 Quét dữ liệu từ WorkAI</button>
+                    <button id="btn-submit-preview" class="btn primary" style="width: auto; padding: 6px 16px; font-size: 0.85rem; background: var(--success);">💾 Cập nhật tất cả lên WorkAI</button>
+                </div>
+                <div id="preview-tasks-container">
+                    <div class="empty-state">Chưa có dữ liệu preview. Nhấn "Quét dữ liệu từ WorkAI" để tải thông tin công việc đã nhập.</div>
                 </div>
             </div>
         </div>

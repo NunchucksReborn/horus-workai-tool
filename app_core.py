@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.18"
+APP_VERSION = "1.0.19"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -645,6 +645,172 @@ def cancel_nhapviec():
             return {"status": "success", "message": "Đã hủy tiến trình nhập việc."}
         else:
             return {"status": "error", "message": "Không có tiến trình nhập việc nào đang chạy."}
+
+# --- Preview & Edit Feature Endpoints ---
+preview_process = None
+preview_process_lock = threading.Lock()
+
+def run_preview_scan_process():
+    global preview_process
+    import subprocess
+    import sys
+    try:
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with preview_process_lock:
+            preview_process = subprocess.Popen(
+                [sys.executable, "preview_helper.py", "--mode", "scan"],
+                cwd=BASE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8"
+            )
+        stdout, stderr = preview_process.communicate()
+        returncode = preview_process.returncode
+        with preview_process_lock:
+            preview_process = None
+            
+        if returncode != 0:
+            has_error = False
+            if os.path.exists(status_file):
+                try:
+                    with open(status_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if data.get("status") in ("error", "cancelled"):
+                            has_error = True
+                except:
+                    pass
+            if not has_error:
+                error_msg = stderr or stdout or "Lỗi không xác định"
+                with open(status_file, "w", encoding="utf-8") as f:
+                    json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi thực thi quét: {error_msg}"}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi khởi chạy quét: {str(e)}"}, f, ensure_ascii=False, indent=2)
+        with preview_process_lock:
+            preview_process = None
+
+def run_preview_update_process():
+    global preview_process
+    import subprocess
+    import sys
+    try:
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with preview_process_lock:
+            preview_process = subprocess.Popen(
+                [sys.executable, "preview_helper.py", "--mode", "update"],
+                cwd=BASE_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8"
+            )
+        stdout, stderr = preview_process.communicate()
+        returncode = preview_process.returncode
+        with preview_process_lock:
+            preview_process = None
+            
+        if returncode != 0:
+            has_error = False
+            if os.path.exists(status_file):
+                try:
+                    with open(status_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if data.get("status") in ("error", "cancelled"):
+                            has_error = True
+                except:
+                    pass
+            if not has_error:
+                error_msg = stderr or stdout or "Lỗi không xác định"
+                with open(status_file, "w", encoding="utf-8") as f:
+                    json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi thực thi cập nhật: {error_msg}"}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({"status": "error", "current": 0, "total": 0, "msg": f"Lỗi khởi chạy cập nhật: {str(e)}"}, f, ensure_ascii=False, indent=2)
+        with preview_process_lock:
+            preview_process = None
+
+@app.post("/api/preview/scan")
+def preview_scan():
+    try:
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({"status": "running", "current": 0, "total": 0, "msg": "Đang chuẩn bị quét dữ liệu từ WorkAI..."}, f, ensure_ascii=False, indent=2)
+            
+        # Start scan process in background thread
+        thread = threading.Thread(target=run_preview_scan_process, daemon=True)
+        thread.start()
+        return {"status": "success", "message": "Tiến trình quét dữ liệu WorkAI đã bắt đầu chạy ngầm."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/preview/status")
+def get_preview_status():
+    status_file = os.path.join(BASE_DIR, "preview_status.json")
+    if os.path.exists(status_file):
+        try:
+            with open(status_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            return {"status": "error", "current": 0, "total": 0, "msg": f"Lỗi đọc trạng thái: {str(e)}"}
+    return {"status": "idle", "current": 0, "total": 0, "msg": "Chưa bắt đầu tiến trình preview."}
+
+@app.get("/api/preview/data")
+def get_preview_data():
+    data_file = os.path.join(BASE_DIR, "preview_tasks.json")
+    if os.path.exists(data_file):
+        try:
+            with open(data_file, "r", encoding="utf-8") as f:
+                return {"tasks": json.load(f)}
+        except Exception as e:
+            return {"tasks": [], "error": f"Lỗi đọc dữ liệu: {str(e)}"}
+    return {"tasks": []}
+
+@app.post("/api/preview/update")
+def preview_update(tasks: list = Body(...)):
+    try:
+        edit_file = os.path.join(BASE_DIR, "preview_tasks_edit.json")
+        with open(edit_file, "w", encoding="utf-8") as f:
+            json.dump(tasks, f, ensure_ascii=False, indent=2)
+            
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({"status": "running", "current": 0, "total": len(tasks), "msg": "Đang chuẩn bị cập nhật dữ liệu lên WorkAI..."}, f, ensure_ascii=False, indent=2)
+            
+        # Start update process in background thread
+        thread = threading.Thread(target=run_preview_update_process, daemon=True)
+        thread.start()
+        return {"status": "success", "message": "Tiến trình cập nhật dữ liệu lên WorkAI đã bắt đầu chạy ngầm."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/preview/cancel")
+def cancel_preview():
+    global preview_process
+    with preview_process_lock:
+        if preview_process is not None:
+            try:
+                preview_process.terminate()
+                preview_process.wait(timeout=2)
+            except Exception:
+                try:
+                    preview_process.kill()
+                except Exception:
+                    pass
+            preview_process = None
+            
+            # Write status to cancelled
+            status_file = os.path.join(BASE_DIR, "preview_status.json")
+            try:
+                with open(status_file, "w", encoding="utf-8") as f:
+                    json.dump({"status": "error", "current": 0, "total": 0, "msg": "Tiến trình đã bị người dùng hủy bỏ."}, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+            return {"status": "success", "message": "Đã dừng tiến trình preview/cập nhật."}
+        else:
+            return {"status": "error", "message": "Không có tiến trình preview/cập nhật nào đang chạy."}
 
 class ChatRequest(BaseModel):
     message: str

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.18",
-  "released_at": "2026-06-12",
-  "changelog": "Thêm popup xác nhận trước khi nhập việc lên WorkAI và nút Hủy tiến trình trong overlay nhập việc; xác nhận hệ thống chống trùng lặp bằng dấu vân tay."
+  "version": "1.0.19",
+  "released_at": "2026-06-13",
+  "changelog": "Thêm tính năng Xem & Sửa việc đã nhập (Preview & Edit); tự động quét các trường Title, Description, Acceptance Criteria trực tiếp từ WorkAI và cập nhật hàng loạt các thay đổi."
 }

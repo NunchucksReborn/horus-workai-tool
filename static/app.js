@@ -561,6 +561,258 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let previewTasks = [];
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderPreviewTasks() {
+        const container = document.getElementById('preview-tasks-container');
+        if (!container) return;
+        
+        if (previewTasks.length === 0) {
+            container.innerHTML = `<div class="empty-state">Chưa có dữ liệu preview. Nhấn "Quét dữ liệu từ WorkAI" để tải thông tin công việc đã nhập.</div>`;
+            return;
+        }
+        
+        container.innerHTML = '';
+        previewTasks.forEach((task, index) => {
+            const card = document.createElement('div');
+            card.className = 'preview-task-card';
+            card.style.padding = '20px';
+            card.style.marginBottom = '20px';
+            card.style.borderRadius = '12px';
+            card.style.border = '1px solid var(--panel-border)';
+            card.style.background = 'rgba(30, 41, 59, 0.4)';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.gap = '12px';
+            card.dataset.index = index;
+            card.dataset.issueKey = task.issue_key || '';
+            card.dataset.project = task.project || '';
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                    <span style="font-weight: 600; color: #60a5fa; font-size: 1.05rem;">${task.issue_key || 'Chưa có Key'}</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Dự án: ${task.project || ''}</span>
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Tiêu đề (Summary)</label>
+                    <input type="text" class="preview-title-input" value="${escapeHtml(task.title || '')}" style="margin-bottom: 0;">
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Mô tả (Description)</label>
+                    <textarea class="preview-desc-textarea" rows="4" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--panel-border); background:var(--input-bg); color:var(--text-primary); outline:none; font-family:inherit; font-size:0.95rem; resize:vertical;">${escapeHtml(task.description || '')}</textarea>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Tiêu chí nghiệm thu (Acceptance Criteria)</label>
+                    <textarea class="preview-ac-textarea" rows="3" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--panel-border); background:var(--input-bg); color:var(--text-primary); outline:none; font-family:inherit; font-size:0.95rem; resize:vertical;">${escapeHtml(task.acceptance_criteria || '')}</textarea>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    document.getElementById('btn-scan-preview').addEventListener('click', async () => {
+        const overlay = document.getElementById('progress-overlay');
+        const fill = document.getElementById('progress-bar-fill');
+        const percent = document.getElementById('progress-percent');
+        const count = document.getElementById('progress-count');
+        const msg = document.getElementById('progress-msg');
+        const titleEl = document.getElementById('progress-title');
+        const cancelBtn = document.getElementById('btn-cancel-nhapviec');
+        
+        // Reset overlay for scanning
+        if (titleEl) titleEl.textContent = "Đang quét dữ liệu từ WorkAI...";
+        fill.style.width = '0%';
+        percent.textContent = '0%';
+        count.textContent = '0/0';
+        msg.textContent = 'Đang chuẩn bị quét...';
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = "Hủy tiến trình";
+        }
+
+        let intervalId = null;
+
+        try {
+            const res = await fetch('/api/preview/scan', { method: 'POST' });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Không thể khởi chạy tiến trình quét.");
+            }
+
+            intervalId = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/preview/status');
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        
+                        const total = statusData.total || 0;
+                        const current = statusData.current || 0;
+                        const state = statusData.status;
+                        const message = statusData.msg || '';
+
+                        const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+                        fill.style.width = `${percentage}%`;
+                        percent.textContent = `${percentage}%`;
+                        count.textContent = `${current}/${total}`;
+                        msg.textContent = message;
+
+                        if (state === 'success') {
+                            clearInterval(intervalId);
+                            setTimeout(async () => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                // Load scanned data
+                                const dataRes = await fetch('/api/preview/data');
+                                if (dataRes.ok) {
+                                    const previewData = await dataRes.json();
+                                    previewTasks = previewData.tasks || [];
+                                    renderPreviewTasks();
+                                }
+                                alert("Đã quét thành công các công việc từ WorkAI!");
+                            }, 1000);
+                        } else if (state === 'error') {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                alert("Lỗi khi quét công việc:\n" + message);
+                            }, 1000);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Lỗi thăm dò trạng thái quét:", err);
+                }
+            }, 1000);
+
+        } catch (e) {
+            if (intervalId) clearInterval(intervalId);
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
+            alert("Lỗi: " + e.message);
+        }
+    });
+
+    document.getElementById('btn-submit-preview').addEventListener('click', async () => {
+        const cards = document.querySelectorAll('.preview-task-card');
+        if (cards.length === 0) {
+            alert("Không có công việc nào để cập nhật. Hãy chạy Quét dữ liệu trước.");
+            return;
+        }
+
+        const updatedTasks = [];
+        cards.forEach(card => {
+            const index = card.dataset.index;
+            const issueKey = card.dataset.issueKey;
+            const project = card.dataset.project;
+            const titleInput = card.querySelector('.preview-title-input');
+            const descTextarea = card.querySelector('.preview-desc-textarea');
+            const acTextarea = card.querySelector('.preview-ac-textarea');
+
+            updatedTasks.push({
+                issue_key: issueKey,
+                project: project,
+                title: titleInput ? titleInput.value.trim() : '',
+                description: descTextarea ? descTextarea.value.trim() : '',
+                acceptance_criteria: acTextarea ? acTextarea.value.trim() : ''
+            });
+        });
+
+        if (!confirm("Bạn có chắc chắn muốn cập nhật các thay đổi này lên WorkAI không?")) {
+            return;
+        }
+
+        const overlay = document.getElementById('progress-overlay');
+        const fill = document.getElementById('progress-bar-fill');
+        const percent = document.getElementById('progress-percent');
+        const count = document.getElementById('progress-count');
+        const msg = document.getElementById('progress-msg');
+        const titleEl = document.getElementById('progress-title');
+        const cancelBtn = document.getElementById('btn-cancel-nhapviec');
+        
+        // Reset overlay for updating
+        if (titleEl) titleEl.textContent = "Đang cập nhật lên WorkAI...";
+        fill.style.width = '0%';
+        percent.textContent = '0%';
+        count.textContent = '0/0';
+        msg.textContent = 'Đang khởi động tiến trình cập nhật...';
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = "Hủy tiến trình";
+        }
+
+        let intervalId = null;
+
+        try {
+            const res = await fetch('/api/preview/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedTasks)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Không thể khởi chạy tiến trình cập nhật.");
+            }
+
+            intervalId = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/preview/status');
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        
+                        const total = statusData.total || 0;
+                        const current = statusData.current || 0;
+                        const state = statusData.status;
+                        const message = statusData.msg || '';
+
+                        const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+                        fill.style.width = `${percentage}%`;
+                        percent.textContent = `${percentage}%`;
+                        count.textContent = `${current}/${total}`;
+                        msg.textContent = message;
+
+                        if (state === 'success') {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                alert("Đã cập nhật thành công lên WorkAI!");
+                            }, 1000);
+                        } else if (state === 'error') {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                alert("Lỗi khi cập nhật công việc:\n" + message);
+                            }, 1000);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Lỗi thăm dò trạng thái cập nhật:", err);
+                }
+            }, 1000);
+
+        } catch (e) {
+            if (intervalId) clearInterval(intervalId);
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
+            alert("Lỗi: " + e.message);
+        }
+    });
+
     const btnTonghop = document.getElementById('btn-tool-tonghop');
     btnTonghop.addEventListener('click', () => runTonghopFlow(false));
 
@@ -642,15 +894,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelNhapviec = document.getElementById('btn-cancel-nhapviec');
     if (btnCancelNhapviec) {
         btnCancelNhapviec.addEventListener('click', async () => {
-            if (confirm("Bạn có chắc chắn muốn hủy tiến trình nhập việc đang chạy? Các công việc đã nhập thành công sẽ được giữ nguyên.")) {
+            if (confirm("Bạn có chắc chắn muốn hủy tiến trình đang chạy? Các công việc đã cập nhật/thêm thành công sẽ được giữ nguyên.")) {
                 try {
                     btnCancelNhapviec.disabled = true;
                     btnCancelNhapviec.textContent = "Đang hủy...";
-                    const res = await fetch('/api/run/nhapviec/cancel', { method: 'POST' });
-                    if (res.ok) {
-                        const data = await res.json();
-                        console.log(data.message);
-                    }
+                    await fetch('/api/run/nhapviec/cancel', { method: 'POST' });
+                    await fetch('/api/preview/cancel', { method: 'POST' });
                 } catch (err) {
                     console.error("Lỗi khi gửi yêu cầu hủy:", err);
                 } finally {
