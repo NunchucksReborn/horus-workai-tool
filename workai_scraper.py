@@ -92,16 +92,16 @@ def scan_workai_kpis(username, password):
 
             # 2. Go directly to Personal KPIs page, with fallback to sidebar clicking
             try:
-                page.goto("https://workai.horus.io.vn/kpis", timeout=15000)
+                page.goto("https://workai.horus.io.vn/kpi/user", timeout=15000)
                 page.wait_for_timeout(3000)
             except Exception as e:
-                print(f"Direct navigation to /kpis failed: {e}. Trying sidebar fallback...")
+                print(f"Direct navigation to /kpi/user failed: {e}. Trying sidebar fallback...")
                 page.goto("https://workai.horus.io.vn/timeline-schedule", timeout=15000)
                 page.wait_for_timeout(3000)
 
-                # Click KPIs link in sidebar (matching 'KPIs cá nhân', 'KPI cá nhân', 'KPIs', 'Báo cáo KPI', href='/kpis')
+                # Click KPIs link in sidebar (matching 'KPIs cá nhân', 'KPI cá nhân', 'KPIs', 'Báo cáo KPI', href='/kpi')
                 kpi_link = None
-                for selector in ['a[href*="kpi"]', 'a[href*="KPI"]', 'text="KPIs cá nhân"', 'text="KPI cá nhân"', 'text="KPIs"', 'text="Báo cáo KPI"']:
+                for selector in ['a[href*="kpi"]', 'a[href*="KPI"]', 'text="KPI cá nhân"', 'text="KPIs cá nhân"', 'text="KPIs"', 'text="Báo cáo KPI"']:
                     loc = page.locator(selector).first
                     if loc.count() > 0 and loc.is_visible():
                         kpi_link = loc
@@ -110,7 +110,7 @@ def scan_workai_kpis(username, password):
                     kpi_link.click()
                     page.wait_for_timeout(4000)
                 else:
-                    raise Exception("Không tìm thấy link 'KPIs cá nhân' hoặc 'KPIs' trên sidebar")
+                    raise Exception("Không tìm thấy link 'KPI cá nhân' hoặc 'KPIs' trên sidebar")
             
             # 4. Tìm tất cả các dòng có trạng thái "Không đạt" hoặc các trạng thái không đạt chuẩn khác
             # Sử dụng regex để khớp chính xác các trạng thái lỗi/cảnh báo phổ biến

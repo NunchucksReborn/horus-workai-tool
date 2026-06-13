@@ -1,5 +1,5 @@
 {
-  "version": "1.0.22",
+  "version": "1.0.23",
   "released_at": "2026-06-13",
-  "changelog": "Di chuyển vị trí nút 'Làm mới Dự án WorkAI' lên trên đầu thanh công cụ (trên nút '1. Tổng hợp') theo yêu cầu người dùng để thuận tiện thao tác."
+  "changelog": "Sửa đường dẫn truy cập trang KPI cá nhân thành `/kpi/user` (thay vì `/kpis`) để đảm bảo quét đúng các đầu việc chưa đạt chuẩn của người dùng đăng nhập."
 }
