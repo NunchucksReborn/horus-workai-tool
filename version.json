@@ -1,0 +1,5 @@
+{
+  "version": "1.0.29",
+  "released_at": "2026-06-13",
+  "changelog": "Khắc phục triệt để lỗi sập nguồn (reset/taskkill) khi cập nhật KPI bằng cách thêm logic đánh chặn cho preview_helper.py trong main.py; đồng thời sửa lỗi ModuleNotFoundError của greenlet bằng cách khai báo hiddenimport trong main.spec."
+}
