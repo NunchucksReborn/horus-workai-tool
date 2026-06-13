@@ -164,9 +164,43 @@
                     </div>
                 </div>
                 <div style="margin-top: 30px; border-top: 1px dashed #444; padding-top: 20px;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: var(--accent);">Phần 2: Task AI sinh (đã wrap theo Rule B)</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--accent);">Phần 2: Task AI sinh (Title + Description + AC)</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-nhapviec-manual" class="btn primary" style="width: auto; padding: 6px 16px; font-size: 0.85rem; background: var(--success); display: none;" disabled>🚀 Nhập việc ngay</button>
+                        </div>
+                    </div>
                     <div id="manual-results-container">
                         <div class="empty-state">Chưa có task nào. Bấm "AI tạo task" ở trên.</div>
+                    </div>
+                </div>
+                <div id="manual-nhapviec-status" style="margin-top: 20px; display: none;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; border-left: 3px solid var(--accent);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-weight: 600;">Trạng thái nhập việc:</span>
+                            <span id="manual-nhapviec-status-text" style="font-size: 0.85rem;">Đang chờ...</span>
+                        </div>
+                        <div id="manual-nhapviec-progress" style="font-size: 0.8rem; color: #888;">0/0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Chi tiet task (Description + AC) -->
+            <div id="manual-detail-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="manual-detail-title" style="margin: 0; font-size: 1.1rem;">Chi tiết task</h3>
+                        <button class="modal-close" id="manual-detail-close" type="button">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div style="margin-bottom: 15px;">
+                            <h4 style="margin: 0 0 6px 0; color: var(--accent); font-size: 0.95rem;">Description</h4>
+                            <pre id="manual-detail-description" style="white-space: pre-wrap; font-family: inherit; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 0.85rem; margin: 0;"></pre>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 6px 0; color: var(--accent); font-size: 0.95rem;">Acceptance Criteria</h4>
+                            <pre id="manual-detail-ac" style="white-space: pre-wrap; font-family: inherit; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 0.85rem; margin: 0;"></pre>
+                        </div>
                     </div>
                 </div>
             </div>
