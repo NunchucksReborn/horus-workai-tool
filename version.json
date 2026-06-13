@@ -1,5 +1,5 @@
 {
-  "version": "1.0.31",
+  "version": "1.0.32",
   "released_at": "2026-06-14",
-  "changelog": "Them GDD (Game Design Document) context cho tab Manual: moi project co the tao file gdd/<project_code>.md (gitignored) lam context giup AI sinh Description + Acceptance Criteria sat voi du an. File row trong form manual them combobox project (bat buoc). Backend validate project_code (400 neu thieu), load GDD theo project unique, inject vao system prompt. In-memory cache, lazy load. Co the xem GDD qua GET /api/projects/{code}/gdd."
+  "changelog": "An panel Athena AI chat (theo yeu cau user). Backend /api/chat, helper edit_task_with_ai, edit_raw_tasks_with_ai, ChatRequest van giu nguyen de dung lai neu can. Comment block HTML de de uncomment khi muon bat lai chat panel. Workspace tu dong rong hon (350px trai)."
 }
