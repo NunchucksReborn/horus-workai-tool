@@ -1,5 +1,5 @@
 {
-  "version": "1.0.25",
+  "version": "1.0.27",
   "released_at": "2026-06-13",
-  "changelog": "Sửa lỗi cào nhầm container tổng thể làm gộp các đầu việc KPI thành một: Sử dụng giải thuật JS DOM traversal thông minh để xác định chính xác thẻ hàng (row container) cho từng đầu việc."
+  "changelog": "Triển khai tính năng tự động cập nhật sửa đổi tiêu đề KPI chưa đạt chuẩn lên WorkAI thông qua Playwright, bảo toàn mô tả và tiêu chí nghiệm thu hiện tại."
 }

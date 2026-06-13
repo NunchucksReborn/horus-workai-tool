@@ -198,9 +198,9 @@ def do_update(page, tasks):
     
     for idx, t in enumerate(tasks, 1):
         issue_key = t.get("issue_key")
-        title = t.get("title", "")
-        description = t.get("description", "")
-        acceptance_criteria = t.get("acceptance_criteria", "")
+        title = t.get("title")
+        description = t.get("description")
+        acceptance_criteria = t.get("acceptance_criteria")
         
         if not issue_key:
             print(f"[{idx}/{total}] Bỏ qua task không có issue_key")
@@ -228,19 +228,19 @@ def do_update(page, tasks):
                 const acTextarea = sheet.querySelector('textarea[name="acceptance_criteria"]');
                 
                 let changed = false;
-                if (summaryInput && summaryInput.value !== t) {
+                if (t !== null && t !== undefined && summaryInput && summaryInput.value !== t) {
                     summaryInput.value = t;
                     summaryInput.dispatchEvent(new Event('input', { bubbles: true }));
                     summaryInput.dispatchEvent(new Event('change', { bubbles: true }));
                     changed = true;
                 }
-                if (descTextarea && descTextarea.value !== desc) {
+                if (desc !== null && desc !== undefined && descTextarea && descTextarea.value !== desc) {
                     descTextarea.value = desc;
                     descTextarea.dispatchEvent(new Event('input', { bubbles: true }));
                     descTextarea.dispatchEvent(new Event('change', { bubbles: true }));
                     changed = true;
                 }
-                if (acTextarea && acTextarea.value !== ac) {
+                if (ac !== null && ac !== undefined && acTextarea && acTextarea.value !== ac) {
                     acTextarea.value = ac;
                     acTextarea.dispatchEvent(new Event('input', { bubbles: true }));
                     acTextarea.dispatchEvent(new Event('change', { bubbles: true }));

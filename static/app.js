@@ -568,10 +568,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderKpiTasks() {
         const container = document.getElementById('kpi-tasks-container');
+        const submitBtn = document.getElementById('btn-submit-kpi');
         if (kpiTasks.length === 0) {
             container.innerHTML = `<div class="empty-state">Tuyệt vời! Bạn không có đầu việc nào bị đánh giá "Không đạt".</div>`;
+            if (submitBtn) submitBtn.style.display = 'none';
             return;
         }
+        if (submitBtn) submitBtn.style.display = 'block';
 
         container.innerHTML = '';
         kpiTasks.forEach((task, index) => {
@@ -590,7 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="task-content" style="margin-top: 10px;">
                     <strong style="color: var(--primary);">🤖 AI Đề xuất sửa:</strong>
-                    <textarea class="kpi-fixed-title" rows="2" style="width: 100%; margin-top: 5px; padding: 10px; background: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-primary); border-radius: 6px;">${task.fixed_title}</textarea>
+                    <textarea class="kpi-fixed-title" data-index="${index}" rows="2" style="width: 100%; margin-top: 5px; padding: 10px; background: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-primary); border-radius: 6px;">${task.fixed_title}</textarea>
                 </div>
             `;
             container.appendChild(div);
@@ -838,6 +841,113 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } catch (err) {
                     console.error("Lỗi thăm dò trạng thái cập nhật:", err);
+                }
+            }, 1000);
+
+        } catch (e) {
+            if (intervalId) clearInterval(intervalId);
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
+            alert("Lỗi: " + e.message);
+        }
+    });
+
+    document.getElementById('btn-submit-kpi').addEventListener('click', async () => {
+        const textareas = document.querySelectorAll('.kpi-fixed-title');
+        if (textareas.length === 0) {
+            alert("Không có đầu việc KPI nào để cập nhật.");
+            return;
+        }
+
+        const updatedKpis = [];
+        textareas.forEach(ta => {
+            const idx = parseInt(ta.dataset.index);
+            if (kpiTasks[idx]) {
+                kpiTasks[idx].fixed_title = ta.value.trim();
+                updatedKpis.push(kpiTasks[idx]);
+            }
+        });
+
+        if (updatedKpis.length === 0) {
+            alert("Không có đầu việc KPI nào để cập nhật.");
+            return;
+        }
+
+        if (!confirm(`Bạn có chắc chắn muốn cập nhật tiêu đề mới cho ${updatedKpis.length} đầu việc KPI này lên WorkAI không?`)) {
+            return;
+        }
+
+        const overlay = document.getElementById('progress-overlay');
+        const fill = document.getElementById('progress-bar-fill');
+        const percent = document.getElementById('progress-percent');
+        const count = document.getElementById('progress-count');
+        const msg = document.getElementById('progress-msg');
+        const titleEl = document.getElementById('progress-title');
+        const cancelBtn = document.getElementById('btn-cancel-nhapviec');
+        
+        // Reset overlay for updating
+        if (titleEl) titleEl.textContent = "Đang cập nhật KPI lên WorkAI...";
+        fill.style.width = '0%';
+        percent.textContent = '0%';
+        count.textContent = `0/${updatedKpis.length}`;
+        msg.textContent = 'Đang khởi động tiến trình cập nhật KPI...';
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = "Hủy tiến trình";
+        }
+
+        let intervalId = null;
+
+        try {
+            const res = await fetch('/api/kpi/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedKpis)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Không thể khởi chạy tiến trình cập nhật KPI.");
+            }
+
+            intervalId = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/preview/status');
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        
+                        const total = statusData.total || 0;
+                        const current = statusData.current || 0;
+                        const state = statusData.status;
+                        const message = statusData.msg || '';
+
+                        const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+                        fill.style.width = `${percentage}%`;
+                        percent.textContent = `${percentage}%`;
+                        count.textContent = `${current}/${total}`;
+                        msg.textContent = message;
+
+                        if (state === 'success') {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                alert("Đã cập nhật KPI thành công lên WorkAI!");
+                                // Tải lại danh sách KPI để cập nhật trạng thái mới
+                                document.getElementById('btn-tool-suakpi').click();
+                            }, 1000);
+                        } else if (state === 'error') {
+                            clearInterval(intervalId);
+                            setTimeout(() => {
+                                overlay.style.display = 'none';
+                                overlay.classList.add('hidden');
+                                alert("Lỗi khi cập nhật KPI:\n" + message);
+                            }, 1000);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Lỗi thăm dò trạng thái cập nhật KPI:", err);
                 }
             }, 1000);
 

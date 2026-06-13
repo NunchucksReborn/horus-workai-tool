@@ -9,7 +9,7 @@ import os
 import sys
 import json
 
-APP_VERSION = "1.0.25"
+APP_VERSION = "1.0.27"
 
 app = FastAPI(title="Athena Assistant App")
 
@@ -377,6 +377,59 @@ def scan_and_fix_kpi():
             json.dump(fixed_tasks, f, ensure_ascii=False, indent=2)
             
         return {"status": "success", "tasks": fixed_tasks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/kpi/update")
+def kpi_update(tasks: list = Body(...)):
+    try:
+        formatted_tasks = []
+        import re
+        for t in tasks:
+            title = t.get("title", "")
+            fixed_title = t.get("fixed_title", "")
+            if not fixed_title:
+                fixed_title = title
+            
+            # Extract JIRA key (e.g. GRPG-1783)
+            match = re.search(r'([A-Z0-9]+-\d+)', title)
+            if match:
+                issue_key = match.group(1)
+                
+                # Clean fixed_title by removing any JIRA key prefix (e.g. "GRPG-1783 - " or "GRPG-1783:")
+                clean_title = fixed_title
+                prefix_match = re.match(r'^' + re.escape(issue_key) + r'\s*[:-]?\s*(.*)$', fixed_title, re.IGNORECASE)
+                if prefix_match:
+                    clean_title = prefix_match.group(1).strip()
+                
+                formatted_tasks.append({
+                    "issue_key": issue_key,
+                    "title": clean_title,
+                    "description": None,
+                    "acceptance_criteria": None
+                })
+        if not formatted_tasks:
+            raise HTTPException(status_code=400, detail="Không tìm thấy JIRA key hợp lệ trong các đầu việc.")
+        
+        # Write to the preview tasks edit file
+        edit_file = os.path.join(BASE_DIR, "preview_tasks_edit.json")
+        with open(edit_file, "w", encoding="utf-8") as f:
+            json.dump(formatted_tasks, f, ensure_ascii=False, indent=2)
+        
+        # Initialize preview status
+        status_file = os.path.join(BASE_DIR, "preview_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "status": "running",
+                "current": 0,
+                "total": len(formatted_tasks),
+                "msg": "Đang chuẩn bị cập nhật KPI lên WorkAI..."
+            }, f, ensure_ascii=False, indent=2)
+        
+        # Start the background thread
+        thread = threading.Thread(target=run_preview_update_process, daemon=True)
+        thread.start()
+        return {"status": "success", "message": "Tiến trình cập nhật KPI đã bắt đầu."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

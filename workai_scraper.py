@@ -154,7 +154,7 @@ def scan_workai_kpis(username, password):
             # Duyệt qua từng badge/nút trạng thái lỗi để mở rộng thông tin chi tiết
             for idx, badge in enumerate(failed_badges):
                 # Sử dụng JavaScript để tìm chính xác phần tử hàng (row container) chứa badge này
-                # Tránh lấy nhầm container lớn bao ngoài
+                # Đảm bảo hàng chứa JIRA key và có chiều dài text hợp lý
                 try:
                     row_id = badge.evaluate("""badge => {
                         let current = badge;
@@ -166,9 +166,9 @@ def scan_workai_kpis(username, password):
                                               current.getAttribute('role') === 'row' || 
                                               current.classList.contains('border-b') ||
                                               current.classList.contains('border') ||
-                                              (current.tagName === 'DIV' && (current.classList.contains('flex') || current.classList.contains('grid')) && text.length < 800);
+                                              (current.tagName === 'DIV' && text.length < 800);
                                               
-                            if (isRowLike && (hasJiraKey || text.length < 800)) {
+                            if (isRowLike && hasJiraKey && text.length < 800) {
                                 const badgeText = badge.innerText || "";
                                 if (text.length > badgeText.length + 5) {
                                     const tempId = 'kpi-row-' + Math.random().toString(36).substr(2, 9);
@@ -178,10 +178,13 @@ def scan_workai_kpis(username, password):
                             }
                             current = current.parentElement;
                         }
-                        const tempId = 'kpi-row-' + Math.random().toString(36).substr(2, 9);
-                        badge.parentElement.classList.add(tempId);
-                        return tempId;
+                        return null; // Không tìm thấy hàng hợp lệ chứa JIRA key
                     }""")
+                    
+                    if not row_id:
+                        log_kpi(f"[{idx+1}/{len(failed_badges)}] Bỏ qua phần tử không thuộc hàng JIRA (có thể là card tổng quan).")
+                        continue
+                        
                     row = page.locator(f".{row_id}")
                 except Exception as eval_err:
                     log_kpi(f"Lỗi khi tìm hàng bằng JS: {eval_err}. Dùng fallback xpath...")
