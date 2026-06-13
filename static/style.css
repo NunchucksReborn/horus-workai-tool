@@ -316,7 +316,8 @@ input:focus {
 
 .manual-form-row input.manual-title,
 .manual-form-row input.manual-description,
-.manual-form-row input.manual-date {
+.manual-form-row input.manual-date,
+.manual-form-row select.manual-project {
     background: rgba(0,0,0,0.3);
     border: 1px solid var(--panel-border);
     color: var(--text);
@@ -329,6 +330,7 @@ input:focus {
 .manual-form-row input.manual-title { font-weight: 600; }
 .manual-form-row input.manual-description { font-size: 0.85rem; opacity: 0.9; }
 .manual-form-row input.manual-date { font-size: 0.8rem; max-width: 160px; }
+.manual-form-row select.manual-project { font-size: 0.85rem; cursor: pointer; }
 
 .manual-form-row .btn-remove-row {
     background: transparent;

@@ -1036,10 +1036,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateManualSubmitState() {
-        const titles = manualRowsContainer.querySelectorAll('input.manual-title');
-        let hasTitle = false;
-        titles.forEach(inp => { if (inp.value.trim()) hasTitle = true; });
-        btnSubmitManual.disabled = !hasTitle;
+        const rows = manualRowsContainer.querySelectorAll('.manual-form-row');
+        let canSubmit = false;
+        let hasAnyTitle = false;
+        let allHaveProject = true;
+        rows.forEach(row => {
+            const title = row.querySelector('input.manual-title').value.trim();
+            const project = row.querySelector('select.manual-project').value;
+            if (title) {
+                hasAnyTitle = true;
+                if (!project) allHaveProject = false;
+            }
+        });
+        canSubmit = hasAnyTitle && allHaveProject;
+        btnSubmitManual.disabled = !canSubmit;
+        btnSubmitManual.title = !canSubmit
+            ? (hasAnyTitle && !allHaveProject ? 'Vui lòng gán project cho tất cả task có tiêu đề' : 'Nhập ít nhất 1 tiêu đề')
+            : '';
+    }
+
+    function buildProjectOptions(selectedCode) {
+        let options = `<option value="">-- Chọn dự án (bắt buộc) --</option>`;
+        projectsList.forEach(p => {
+            const selected = (selectedCode && selectedCode === p.code) ? 'selected' : '';
+            options += `<option value="${p.code}" ${selected}>${p.name}</option>`;
+        });
+        return options;
     }
 
     function addManualRow(prefill) {
@@ -1047,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('div');
         row.className = 'manual-form-row';
         row.dataset.rowId = manualRowCounter;
-        const t = prefill || { title: '', description: '', date: getTodayStr() };
+        const t = prefill || { title: '', description: '', date: getTodayStr(), project_code: '' };
         row.innerHTML = `
             <div class="manual-form-row-header">
                 <span>Task #${manualRowCounter}</span>
@@ -1055,6 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <input class="manual-title" type="text" placeholder="Tiêu đề (bắt buộc)" value="${(t.title || '').replace(/"/g, '&quot;')}" />
             <input class="manual-description" type="text" placeholder="Mô tả (tùy chọn)" value="${(t.description || '').replace(/"/g, '&quot;')}" />
+            <select class="manual-project">${buildProjectOptions(t.project_code || '')}</select>
             <input class="manual-date" type="date" value="${t.date || getTodayStr()}" />
         `;
         manualRowsContainer.appendChild(row);
@@ -1064,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateManualSubmitState();
         });
         row.querySelector('input.manual-title').addEventListener('input', updateManualSubmitState);
+        row.querySelector('select.manual-project').addEventListener('change', updateManualSubmitState);
     }
 
     function collectManualInput() {
@@ -1072,9 +1096,10 @@ document.addEventListener('DOMContentLoaded', () => {
         rows.forEach(row => {
             const title = row.querySelector('input.manual-title').value.trim();
             const description = row.querySelector('input.manual-description').value.trim();
+            const project_code = row.querySelector('select.manual-project').value;
             const date = row.querySelector('input.manual-date').value || getTodayStr();
             if (title) {
-                tasks.push({ title, description, date });
+                tasks.push({ title, description, project_code, date });
             }
         });
         return tasks;
