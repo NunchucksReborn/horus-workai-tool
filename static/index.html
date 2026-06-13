@@ -117,9 +117,10 @@
 
             <button id="btn-tool-tonghop" class="btn tool-btn">1. Tổng hợp</button>
             <button id="btn-restore-tasks" class="btn outline tool-btn" style="border-color: #555; color: #888; font-size: 0.8rem; height: 30px; margin-top: 5px;">⟲ Phục hồi xóa</button>
-            <button id="btn-tool-taoviec" class="btn tool-btn" style="margin-top: 15px;">2. Tạo việc</button>
-            <button id="btn-tool-nhapviec" class="btn tool-btn">3. Nhập việc</button>
-            <button id="btn-tool-suakpi" class="btn tool-btn outline" style="border-color: #f59e0b; color: #f59e0b;">4. Sửa KPI</button>
+            <button id="btn-tool-manual" class="btn tool-btn" style="margin-top: 15px;">2. Nhập thủ công</button>
+            <button id="btn-tool-taoviec" class="btn tool-btn">3. Tạo việc</button>
+            <button id="btn-tool-nhapviec" class="btn tool-btn">4. Nhập việc</button>
+            <button id="btn-tool-suakpi" class="btn tool-btn outline" style="border-color: #f59e0b; color: #f59e0b;">5. Sửa KPI</button>
             
             <div class="divider"></div>
             <button id="btn-settings" class="btn tool-btn outline">Cài đặt</button>
@@ -129,6 +130,7 @@
         <div class="area-workspace glass-panel">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="tab-raw">Nội dung thô</button>
+                <button class="tab-btn" data-tab="tab-manual">Nhập thủ công</button>
                 <button class="tab-btn" data-tab="tab-processed">Nội dung sau khi Tạo việc</button>
                 <button class="tab-btn" data-tab="tab-suakpi">Sửa KPI</button>
                 <button class="tab-btn" data-tab="tab-preview">Xem & Sửa việc đã nhập</button>
@@ -149,6 +151,23 @@
                 <div id="raw-tasks-container">
                     <!-- JS render tasks here -->
                     <div class="empty-state">Chưa có dữ liệu. Hãy bấm "1. Tổng hợp".</div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-manual">
+                <div id="manual-input-section">
+                    <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: var(--accent);">Phần 1: Nhập của user</h3>
+                    <div id="manual-task-rows"></div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button id="btn-add-manual-row" class="btn outline" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">+ Thêm task</button>
+                        <button id="btn-submit-manual" class="btn primary" style="width: auto; padding: 6px 16px; font-size: 0.85rem;" disabled>AI tạo task</button>
+                    </div>
+                </div>
+                <div style="margin-top: 30px; border-top: 1px dashed #444; padding-top: 20px;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 1rem; color: var(--accent);">Phần 2: Task AI sinh (đã wrap theo Rule B)</h3>
+                    <div id="manual-results-container">
+                        <div class="empty-state">Chưa có task nào. Bấm "AI tạo task" ở trên.</div>
+                    </div>
                 </div>
             </div>
 
