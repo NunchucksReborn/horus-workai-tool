@@ -9,6 +9,9 @@
     --danger: #ef4444;
     --success: #22c55e;
     --input-bg: rgba(15, 23, 42, 0.6);
+    /* Browser tu render form controls (select, input) theo system theme.
+    Set dark de tranh select bi nen trang default khi dong. */
+    color-scheme: dark;
 }
 
 * {
@@ -375,10 +378,20 @@ input:focus {
 .task-project-select {
     padding: 8px;
     background: var(--input-bg);
-    color: white;
+    color: var(--text-primary);
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     outline: none;
+}
+
+/* Fix option trang bi trang tren GTK/WebKit: option ke thua system theme (nen trang,
+chu den), nhung khi select dong, text selected hien thi color trang tren nen trang
+default cua browser => invisible. Ep background dam cho ca option. */
+.task-project-select option,
+.manual-project option,
+.manual-form-row select.manual-project option {
+    background-color: #1e293b;
+    color: var(--text-primary);
 }
 
 /* Loading dot animation */
