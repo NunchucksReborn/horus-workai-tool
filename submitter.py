@@ -43,6 +43,17 @@ def update_status(status, current, total, msg):
         print(f"[WARNING] Failed to write status: {e}")
 
 
+def should_skip_ai_suggest(description_body):
+    """Kiem tra xem co can click 'Goi y bang AI' tren WorkAI khong.
+
+    Tra ve True neu description da co noi dung (skip click AI de giu nguyen).
+    Tra ve False neu description rong (WorkAI can AI goi y de sinh description).
+    """
+    if not description_body:
+        return False
+    return len(description_body.strip()) > 5
+
+
 # Set browsers path for PyInstaller frozen app or local execution
 if getattr(sys, 'frozen', False):
     bundle_dir = sys._MEIPASS
@@ -340,7 +351,7 @@ def create_issue(page, task, col_index, idx, total):
     except Exception:
         pass
         
-    if ai_button.count() > 0:
+    if ai_button.count() > 0 and not should_skip_ai_suggest(desc_body):
         update_status("running", idx - 1, total, f"Task {idx}/{total}: Đang chạy gợi ý bằng AI...")
         print("Clicking 'G\u1ee3i \u00fd b\u1eb1ng AI'...")
         ai_button.click()
