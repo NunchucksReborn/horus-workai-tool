@@ -467,3 +467,106 @@ TUYET DOI KHONG tra loi giao tiep, giai thich hoac ghi chu gi khac ngoai chuoi J
                 merged = f"{merged} - {t['description']}" if merged else t["description"]
             fallback.append({"title": merged, "date": t["date"]})
         return json.dumps(fallback, ensure_ascii=False)
+
+
+def wrap_user_tasks_full(tasks, provider, api_key, user_name="Chu Van Mai"):
+    """
+    Mo rong cua wrap_user_tasks: sinh Title (Rule B) + Description (3 phan) + Acceptance Criteria.
+    Moi task input: {"title": str, "description": str (optional), "date": "YYYY-MM-DD" (optional, default today)}.
+    Tra ve JSON string array: [{"title", "description", "acceptance_criteria", "date"}]
+
+    description format: "1. Background: <text>\n2. Objective: <text>\n3. Notes: <text>"
+    acceptance_criteria format: moi line bat dau bang "1. ", "2. ", ...
+    """
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    normalized = []
+    for t in tasks:
+        normalized.append({
+            "title": (t.get("title") or "").strip(),
+            "description": (t.get("description") or "").strip(),
+            "date": (t.get("date") or "").strip() or today_str,
+        })
+
+    system_prompt = """Ban la tro ly ao PM.
+Nhiem vu: WRAP moi task input thanh 4 truong chuan:
+1. **title**: format Rule B `[Hanh dong cu the] - [Muc tieu cu the]`, toi thieu 50 ky tu.
+   Neu title qua ngan, hay mo rong bang description input.
+2. **description**: gom 3 phan, moi phan bat dau bang "1. ", "2. ", "3. " theo dung format:
+   - "1. Background: <boi canh ngan ve task>"
+   - "2. Objective: <muc tieu cu the can dat>"
+   - "3. Notes: <ghi chú them neu co>"
+3. **acceptance_criteria**: 2-5 tieu chi cu the, do luong duoc, moi line bat dau bang "1. ", "2. ", ...
+4. **date**: giu nguyen input, khong tu thay doi.
+
+Tra ve JSON array, moi phan tu:
+{
+  "title": "title da wrap (>= 50 ky tu)",
+  "description": "1. Background: ...\n2. Objective: ...\n3. Notes: ...",
+  "acceptance_criteria": "1. AC 1\n2. AC 2\n3. AC 3",
+  "date": "YYYY-MM-DD"
+}
+
+TUYET DOI KHONG tra loi giao tiep, giai thich hoac ghi chu gi khac ngoai JSON.
+"""
+
+    user_prompt = "Danh sach task can wrap full:\n\n"
+    for i, t in enumerate(normalized, 1):
+        user_prompt += f"Task #{i}:\n"
+        user_prompt += f"- Title: {t['title']}\n"
+        if t["description"]:
+            user_prompt += f"- Description: {t['description']}\n"
+        user_prompt += f"- Date: {t['date']}\n\n"
+
+    user_prompt += "Hay wrap moi task thanh {title, description, acceptance_criteria, date} theo format tren, giu dung thu tu input."
+
+    try:
+        result = call_ai_provider(provider, api_key, system_prompt, user_prompt)
+        result = result.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        elif result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+
+        parsed = json.loads(result)
+        if not isinstance(parsed, list):
+            raise ValueError("AI khong tra ve list")
+
+        cleaned = []
+        for i, item in enumerate(parsed):
+            if not isinstance(item, dict):
+                raise ValueError(f"Phan tu {i} khong phai object")
+            title = item.get("title", "").strip()
+            description = item.get("description", "").strip()
+            acceptance_criteria = item.get("acceptance_criteria", "").strip()
+            date = item.get("date", "").strip() or (normalized[i]["date"] if i < len(normalized) else today_str)
+            if not title:
+                # Fallback ve title goc
+                title = normalized[i]["title"] if i < len(normalized) else ""
+                description = ""
+                acceptance_criteria = ""
+            cleaned.append({
+                "title": title,
+                "description": description,
+                "acceptance_criteria": acceptance_criteria,
+                "date": date,
+            })
+        return json.dumps(cleaned, ensure_ascii=False)
+    except Exception:
+        # Fallback: title ghep, description/AC rong (submitter se click AI goi y)
+        fallback = []
+        for t in normalized:
+            merged = t["title"]
+            if t["description"] and t["description"] not in merged:
+                merged = f"{merged} - {t['description']}" if merged else t["description"]
+            fallback.append({
+                "title": merged,
+                "description": "",
+                "acceptance_criteria": "",
+                "date": t["date"],
+            })
+        return json.dumps(fallback, ensure_ascii=False)
