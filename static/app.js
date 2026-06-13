@@ -1081,11 +1081,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderManualResults(tasks) {
+        const btnNhapviecManual = document.getElementById('btn-nhapviec-manual');
         if (!tasks || tasks.length === 0) {
             manualResultsContainer.innerHTML = `<div class="empty-state">Chưa có task nào. Bấm "AI tạo task" ở trên.</div>`;
+            if (btnNhapviecManual) btnNhapviecManual.style.display = 'none';
             return;
         }
         manualResultsContainer.innerHTML = '';
+        if (btnNhapviecManual) {
+            btnNhapviecManual.style.display = 'inline-block';
+            btnNhapviecManual.disabled = false;
+        }
         tasks.forEach((task, index) => {
             const div = document.createElement('div');
             div.className = 'task-item manual-result-card';
@@ -1115,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             div.querySelector('.btn-detail-task').addEventListener('click', () => {
-                alert("INPUT GỐC CỦA USER:\n\n" + (task.original_chat || "Không có dữ liệu gốc"));
+                openManualDetailModal(task);
             });
 
             div.querySelector('.task-project-select').addEventListener('change', async (e) => {
@@ -1190,7 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const oldText = btnSubmitManual.textContent;
         btnSubmitManual.textContent = "Đang xử lý...";
         try {
-            const res = await fetch('/api/raw_tasks/from_text', {
+            const res = await fetch('/api/raw_tasks/from_text_full', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tasks })
@@ -1213,6 +1219,93 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             btnSubmitManual.textContent = oldText;
             updateManualSubmitState();
+        }
+    });
+
+    // ============================================================
+    // MODAL CHI TIẾT (Description + AC)
+    // ============================================================
+    const manualDetailModal = document.getElementById('manual-detail-modal');
+    const manualDetailTitle = document.getElementById('manual-detail-title');
+    const manualDetailDescription = document.getElementById('manual-detail-description');
+    const manualDetailAC = document.getElementById('manual-detail-ac');
+    const manualDetailClose = document.getElementById('manual-detail-close');
+
+    function openManualDetailModal(task) {
+        manualDetailTitle.textContent = task.text || task.title || 'Chi tiết task';
+        manualDetailDescription.textContent = task.description || '(Chưa có mô tả - AI sẽ tự sinh khi nhập lên WorkAI)';
+        manualDetailAC.textContent = task.acceptance_criteria || '(Chưa có tiêu chí nghiệm thu)';
+        manualDetailModal.style.display = 'flex';
+    }
+
+    function closeManualDetailModal() {
+        manualDetailModal.style.display = 'none';
+    }
+
+    manualDetailClose.addEventListener('click', closeManualDetailModal);
+    manualDetailModal.addEventListener('click', (e) => {
+        if (e.target === manualDetailModal) closeManualDetailModal();
+    });
+
+    // ============================================================
+    // NÚT "NHẬP VIỆC NGAY" + POLL STATUS
+    // ============================================================
+    const btnNhapviecManual = document.getElementById('btn-nhapviec-manual');
+    const manualNhapviecStatus = document.getElementById('manual-nhapviec-status');
+    const manualNhapviecStatusText = document.getElementById('manual-nhapviec-status-text');
+    const manualNhapviecProgress = document.getElementById('manual-nhapviec-progress');
+    let manualNhapviecPollInterval = null;
+
+    function startManualNhapviecPoll() {
+        if (manualNhapviecPollInterval) clearInterval(manualNhapviecPollInterval);
+        manualNhapviecStatus.style.display = 'block';
+        manualNhapviecStatusText.textContent = 'Đang chờ...';
+        manualNhapviecProgress.textContent = '0/0';
+
+        manualNhapviecPollInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/run/nhapviec/status');
+                if (res.ok) {
+                    const data = await res.json();
+                    manualNhapviecStatusText.textContent = data.msg || data.status || '...';
+                    manualNhapviecProgress.textContent = `${data.current || 0}/${data.total || 0}`;
+
+                    if (data.status === 'success' || data.status === 'error' || data.status === 'cancelled') {
+                        clearInterval(manualNhapviecPollInterval);
+                        manualNhapviecPollInterval = null;
+                        btnNhapviecManual.disabled = false;
+                        btnNhapviecManual.textContent = '🚀 Nhập việc ngay';
+                        if (data.status === 'success') {
+                            // Reload Phan 2: tasks co status=hide se bien mat
+                            await loadManualResults();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Poll error:", e);
+            }
+        }, 2000);
+    }
+
+    btnNhapviecManual.addEventListener('click', async () => {
+        btnNhapviecManual.disabled = true;
+        const oldText = btnNhapviecManual.textContent;
+        btnNhapviecManual.textContent = 'Đang bắt đầu...';
+        try {
+            const res = await fetch('/api/run/nhapviec_manual', { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                startManualNhapviecPoll();
+            } else {
+                const err = await res.json();
+                alert("Lỗi: " + (err.detail || 'Không rõ'));
+                btnNhapviecManual.disabled = false;
+                btnNhapviecManual.textContent = oldText;
+            }
+        } catch (e) {
+            alert("Lỗi kết nối khi nhập việc.");
+            btnNhapviecManual.disabled = false;
+            btnNhapviecManual.textContent = oldText;
         }
     });
 
