@@ -1,5 +1,5 @@
 {
-  "version": "1.0.19",
+  "version": "1.0.20",
   "released_at": "2026-06-13",
-  "changelog": "Thêm tính năng Xem & Sửa việc đã nhập (Preview & Edit); tự động quét các trường Title, Description, Acceptance Criteria trực tiếp từ WorkAI và cập nhật hàng loạt các thay đổi."
+  "changelog": "Sửa lỗi không quét được danh sách KPI cá nhân do thay đổi tiêu đề liên kết ('KPIs cá nhân') trên thanh menu của WorkAI."
 }

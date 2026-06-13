@@ -89,18 +89,27 @@ def scan_workai_kpis(username, password):
             page.click('button[type="submit"]')
             page.wait_for_timeout(3000)
 
-            # 2. Go to Timeline to access sidebar
-            page.goto("https://workai.horus.io.vn/timeline-schedule", timeout=15000)
-            page.wait_for_timeout(3000)
+            # 2. Go directly to Personal KPIs page, with fallback to sidebar clicking
+            try:
+                page.goto("https://workai.horus.io.vn/kpis", timeout=15000)
+                page.wait_for_timeout(3000)
+            except Exception as e:
+                print(f"Direct navigation to /kpis failed: {e}. Trying sidebar fallback...")
+                page.goto("https://workai.horus.io.vn/timeline-schedule", timeout=15000)
+                page.wait_for_timeout(3000)
 
-            # 3. Click KPI cá nhân
-            kpi_link = page.get_by_text("KPI cá nhân")
-            if kpi_link.count() > 0:
-                kpi_link.first.click()
-            else:
-                raise Exception("Không tìm thấy link 'KPI cá nhân' trên sidebar")
-            
-            page.wait_for_timeout(5000)
+                # Click KPIs link in sidebar (matching 'KPIs cá nhân', 'KPI cá nhân', 'KPIs', 'Báo cáo KPI', href='/kpis')
+                kpi_link = None
+                for selector in ['a[href*="kpi"]', 'a[href*="KPI"]', 'text="KPIs cá nhân"', 'text="KPI cá nhân"', 'text="KPIs"', 'text="Báo cáo KPI"']:
+                    loc = page.locator(selector).first
+                    if loc.count() > 0 and loc.is_visible():
+                        kpi_link = loc
+                        break
+                if kpi_link:
+                    kpi_link.click()
+                    page.wait_for_timeout(4000)
+                else:
+                    raise Exception("Không tìm thấy link 'KPIs cá nhân' hoặc 'KPIs' trên sidebar")
             
             # 4. Tìm tất cả các dòng có trạng thái "Không đạt"
             # Theo hình ảnh, nút "Không đạt" là một badge/button trong hàng.
