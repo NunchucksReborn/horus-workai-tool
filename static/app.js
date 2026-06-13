@@ -1017,6 +1017,205 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ============================================================
+    // MANUAL TASK INPUT (Tab "Nhập thủ công")
+    // ============================================================
+    const btnManual = document.getElementById('btn-tool-manual');
+    const btnAddManualRow = document.getElementById('btn-add-manual-row');
+    const btnSubmitManual = document.getElementById('btn-submit-manual');
+    const manualRowsContainer = document.getElementById('manual-task-rows');
+    const manualResultsContainer = document.getElementById('manual-results-container');
+    let manualRowCounter = 0;
+
+    function getTodayStr() {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function updateManualSubmitState() {
+        const titles = manualRowsContainer.querySelectorAll('input.manual-title');
+        let hasTitle = false;
+        titles.forEach(inp => { if (inp.value.trim()) hasTitle = true; });
+        btnSubmitManual.disabled = !hasTitle;
+    }
+
+    function addManualRow(prefill) {
+        manualRowCounter += 1;
+        const row = document.createElement('div');
+        row.className = 'manual-form-row';
+        row.dataset.rowId = manualRowCounter;
+        const t = prefill || { title: '', description: '', date: getTodayStr() };
+        row.innerHTML = `
+            <div class="manual-form-row-header">
+                <span>Task #${manualRowCounter}</span>
+                <button class="btn-remove-row" type="button">Xóa</button>
+            </div>
+            <input class="manual-title" type="text" placeholder="Tiêu đề (bắt buộc)" value="${(t.title || '').replace(/"/g, '&quot;')}" />
+            <input class="manual-description" type="text" placeholder="Mô tả (tùy chọn)" value="${(t.description || '').replace(/"/g, '&quot;')}" />
+            <input class="manual-date" type="date" value="${t.date || getTodayStr()}" />
+        `;
+        manualRowsContainer.appendChild(row);
+
+        row.querySelector('.btn-remove-row').addEventListener('click', () => {
+            row.remove();
+            updateManualSubmitState();
+        });
+        row.querySelector('input.manual-title').addEventListener('input', updateManualSubmitState);
+    }
+
+    function collectManualInput() {
+        const rows = manualRowsContainer.querySelectorAll('.manual-form-row');
+        const tasks = [];
+        rows.forEach(row => {
+            const title = row.querySelector('input.manual-title').value.trim();
+            const description = row.querySelector('input.manual-description').value.trim();
+            const date = row.querySelector('input.manual-date').value || getTodayStr();
+            if (title) {
+                tasks.push({ title, description, date });
+            }
+        });
+        return tasks;
+    }
+
+    function renderManualResults(tasks) {
+        if (!tasks || tasks.length === 0) {
+            manualResultsContainer.innerHTML = `<div class="empty-state">Chưa có task nào. Bấm "AI tạo task" ở trên.</div>`;
+            return;
+        }
+        manualResultsContainer.innerHTML = '';
+        tasks.forEach((task, index) => {
+            const div = document.createElement('div');
+            div.className = 'task-item manual-result-card';
+            div.dataset.id = task.id;
+
+            let options = `<option value="">-- Chọn dự án --</option>`;
+            projectsList.forEach(p => {
+                const selected = (task.project_code && task.project_code === p.code) ? 'selected' : '';
+                options += `<option value="${p.code}" ${selected}>${p.name}</option>`;
+            });
+
+            div.innerHTML = `
+                <div class="task-item-header">
+                    <div>
+                        <span class="task-badge">AI Task #${index + 1}</span>
+                        <select class="task-project-select">${options}</select>
+                    </div>
+                    <div>
+                        <button class="btn outline btn-detail-task" style="width: auto; padding: 2px 8px; font-size: 0.8rem; height: 24px; margin-right: 5px;">Chi tiết</button>
+                        <button class="btn outline btn-delete-task" style="width: auto; border-color: var(--danger); color: var(--danger); padding: 2px 8px; font-size: 0.8rem; height: 24px;">Xóa</button>
+                    </div>
+                </div>
+                <div class="task-content">
+                    <strong>[Thủ công] ${task.sender || ''}:</strong> ${task.text || ''}
+                </div>
+                <div style="font-size: 0.75rem; color: #888; margin-top: 4px;">Ngày: ${task.form_date || ''}</div>
+            `;
+
+            div.querySelector('.btn-detail-task').addEventListener('click', () => {
+                alert("INPUT GỐC CỦA USER:\n\n" + (task.original_chat || "Không có dữ liệu gốc"));
+            });
+
+            div.querySelector('.task-project-select').addEventListener('change', async (e) => {
+                const projectCode = e.target.value;
+                task.project_code = projectCode;
+                try {
+                    await fetch('/api/raw_tasks/update_project', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: task.id, project_code: projectCode })
+                    });
+                } catch(err) {
+                    console.error("Lỗi khi cập nhật dự án:", err);
+                }
+            });
+
+            div.querySelector('.btn-delete-task').addEventListener('click', async () => {
+                if (!task.id) return;
+                try {
+                    await fetch('/api/raw_tasks/hide', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: task.id })
+                    });
+                } catch(err) {
+                    console.error("Lỗi khi ẩn task:", err);
+                }
+                div.remove();
+                if (manualResultsContainer.children.length === 0) {
+                    renderManualResults([]);
+                }
+            });
+
+            manualResultsContainer.appendChild(div);
+        });
+    }
+
+    async function loadManualResults() {
+        try {
+            const res = await fetch('/api/raw_tasks');
+            if (res.ok) {
+                const data = await res.json();
+                const all = data.tasks || [];
+                const manual = all.filter(t => t.room_name === 'Thu cong' && t.status !== 'hide');
+                renderManualResults(manual);
+            }
+        } catch (e) {
+            console.error("Lỗi load manual results:", e);
+        }
+    }
+
+    btnManual.addEventListener('click', () => {
+        // Them 1 row trong lan dau
+        if (manualRowsContainer.children.length === 0) {
+            addManualRow();
+        }
+        updateManualSubmitState();
+        loadManualResults();
+        // Switch sang tab-manual
+        document.querySelector('[data-tab="tab-manual"]').click();
+    });
+
+    btnAddManualRow.addEventListener('click', () => addManualRow());
+
+    btnSubmitManual.addEventListener('click', async () => {
+        const tasks = collectManualInput();
+        if (tasks.length === 0) {
+            alert("Vui lòng nhập ít nhất 1 task có tiêu đề.");
+            return;
+        }
+        btnSubmitManual.disabled = true;
+        const oldText = btnSubmitManual.textContent;
+        btnSubmitManual.textContent = "Đang xử lý...";
+        try {
+            const res = await fetch('/api/raw_tasks/from_text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tasks })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Reload Phan 2 tu server de lay id + format chinh xac
+                await loadManualResults();
+                // Clear form
+                manualRowsContainer.innerHTML = '';
+                manualRowCounter = 0;
+                addManualRow();
+                updateManualSubmitState();
+            } else {
+                const err = await res.json();
+                alert("Lỗi: " + (err.detail || "Không rõ"));
+            }
+        } catch (e) {
+            alert("Lỗi kết nối khi gửi task.");
+        } finally {
+            btnSubmitManual.textContent = oldText;
+            updateManualSubmitState();
+        }
+    });
+
     document.getElementById('btn-tool-taoviec').addEventListener('click', async () => {
         document.getElementById('processed-tasks-container').innerHTML = `<div class="empty-state">AI đang xử lý công việc... Vui lòng chờ...</div>`;
         try {
