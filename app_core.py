@@ -412,6 +412,86 @@ def from_text_endpoint(request: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/raw_tasks/from_text_full")
+def from_text_full_endpoint(request: dict = Body(...)):
+    """Nhan task input thu cong, AI wrap FULL (Title + Description + AC), luu saved_raw_tasks.json."""
+    try:
+        tasks_input = request.get("tasks")
+        if not tasks_input or not isinstance(tasks_input, list):
+            raise HTTPException(status_code=400, detail="Thieu hoac sai dinh dang 'tasks' (can la list khong rong).")
+
+        valid_tasks = [t for t in tasks_input if (t.get("title") or "").strip()]
+        if not valid_tasks:
+            raise HTTPException(status_code=400, detail="Tat ca cac task deu co title rong. Vui long nhap it nhat 1 title.")
+        tasks_input = valid_tasks
+
+        config = load_config()
+        provider = config.get("ai_provider", "openai")
+        api_key = config.get("ai_key", "")
+        sender = config.get("name", "Chu Van Mai")
+
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Chua cau hinh AI API Key. Vui long vao 'Cai dat' de them truoc khi su dung.")
+
+        from ai_processor import wrap_user_tasks_full
+        try:
+            wrapped_json = wrap_user_tasks_full(tasks_input, provider, api_key, sender)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"AI wrap full that bai: {str(e)}")
+
+        try:
+            wrapped = json.loads(wrapped_json)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"AI tra ve JSON khong hop le: {str(e)}")
+
+        if not isinstance(wrapped, list):
+            raise HTTPException(status_code=500, detail="AI tra ve sai dinh dang (khong phai list).")
+
+        import time
+        now_ms = int(time.time() * 1000)
+        saved_tasks_file = os.path.join(BASE_DIR, "saved_raw_tasks.json")
+
+        existing_tasks = []
+        if os.path.exists(saved_tasks_file):
+            try:
+                with open(saved_tasks_file, "r", encoding="utf-8") as f:
+                    existing_tasks = json.load(f)
+            except Exception:
+                existing_tasks = []
+
+        new_tasks = []
+        for i, wt in enumerate(wrapped):
+            input_task = tasks_input[i] if i < len(tasks_input) else {}
+            original_input = input_task.get("title", "") or ""
+            desc = input_task.get("description", "") or ""
+            if desc:
+                original_input = f"{original_input}\n{desc}" if original_input else desc
+
+            new_task = {
+                "id": f"task_{now_ms}_{i}",
+                "status": "active",
+                "room_name": "Thu cong",
+                "sender": sender,
+                "text": wt.get("title", ""),
+                "description": wt.get("description", ""),
+                "acceptance_criteria": wt.get("acceptance_criteria", ""),
+                "project_code": "",
+                "original_chat": original_input,
+                "manual": True,
+                "form_date": wt.get("date", ""),
+            }
+            new_tasks.append(new_task)
+            existing_tasks.append(new_task)
+
+        with open(saved_tasks_file, "w", encoding="utf-8") as f:
+            json.dump(existing_tasks, f, ensure_ascii=False, indent=2)
+
+        return {"status": "success", "tasks": new_tasks}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/kpi/scan_and_fix")
 def scan_and_fix_kpi():
     try:
