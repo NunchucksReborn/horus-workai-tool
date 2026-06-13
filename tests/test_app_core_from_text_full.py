@@ -53,7 +53,7 @@ def test_from_text_full_valid_single_task_persists_full_fields(tmp_path, monkeyp
         ], ensure_ascii=False)
         resp = client.post("/api/raw_tasks/from_text_full", json={
             "tasks": [
-                {"title": "Hop team", "description": "thong nhat scope", "date": "2026-06-13"}
+                {"title": "Hop team", "description": "thong nhat scope", "date": "2026-06-13", "project_code": "GRPG"}
             ]
         })
         assert resp.status_code == 200
@@ -67,6 +67,7 @@ def test_from_text_full_valid_single_task_persists_full_fields(tmp_path, monkeyp
         assert task["room_name"] == "Thu cong"
         assert task["manual"] is True
         assert task["form_date"] == "2026-06-13"
+        assert task["project_code"] == "GRPG"
         # Verify file written
         saved = json.loads((base / "saved_raw_tasks.json").read_text(encoding="utf-8"))
         assert len(saved) == 1
@@ -83,8 +84,8 @@ def test_from_text_full_multiple_tasks_with_missing_description_still_works(tmp_
         ], ensure_ascii=False)
         resp = client.post("/api/raw_tasks/from_text_full", json={
             "tasks": [
-                {"title": "Task 1", "description": "mo ta 1", "date": "2026-06-13"},
-                {"title": "Task 2", "description": "", "date": "2026-06-13"},  # rong
+                {"title": "Task 1", "description": "mo ta 1", "date": "2026-06-13", "project_code": "GRPG"},
+                {"title": "Task 2", "description": "", "date": "2026-06-13", "project_code": "VCNDA"},  # description rong
             ]
         })
         assert resp.status_code == 200

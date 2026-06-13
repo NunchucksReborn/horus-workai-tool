@@ -414,7 +414,7 @@ def from_text_endpoint(request: dict = Body(...)):
 
 @app.post("/api/raw_tasks/from_text_full")
 def from_text_full_endpoint(request: dict = Body(...)):
-    """Nhan task input thu cong, AI wrap FULL (Title + Description + AC), luu saved_raw_tasks.json."""
+    """Nhan task input thu cong, AI wrap FULL (Title + Description + AC) voi GDD context, luu saved_raw_tasks.json."""
     try:
         tasks_input = request.get("tasks")
         if not tasks_input or not isinstance(tasks_input, list):
@@ -425,6 +425,14 @@ def from_text_full_endpoint(request: dict = Body(...)):
             raise HTTPException(status_code=400, detail="Tat ca cac task deu co title rong. Vui long nhap it nhat 1 title.")
         tasks_input = valid_tasks
 
+        missing_project = [t for t in tasks_input if not (t.get("project_code") or "").strip()]
+        if missing_project:
+            raise HTTPException(
+                status_code=400,
+                detail="Vui long gan project (project_code) cho tat ca task truoc khi tao AI. Thieu o " + str(len(missing_project)) + " task."
+            )
+        tasks_input = valid_tasks
+
         config = load_config()
         provider = config.get("ai_provider", "openai")
         api_key = config.get("ai_key", "")
@@ -433,9 +441,17 @@ def from_text_full_endpoint(request: dict = Body(...)):
         if not api_key:
             raise HTTPException(status_code=500, detail="Chua cau hinh AI API Key. Vui long vao 'Cai dat' de them truoc khi su dung.")
 
+        # Load GDD cho moi project unique (silent skip neu khong co file)
+        unique_projects = list({(t.get("project_code") or "").strip() for t in tasks_input if (t.get("project_code") or "").strip()})
+        gdd_map = {}
+        for code in unique_projects:
+            content = get_gdd(code)
+            if content:
+                gdd_map[code] = content
+
         from ai_processor import wrap_user_tasks_full
         try:
-            wrapped_json = wrap_user_tasks_full(tasks_input, provider, api_key, sender)
+            wrapped_json = wrap_user_tasks_full(tasks_input, provider, api_key, sender, gdd_map=gdd_map if gdd_map else None)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"AI wrap full that bai: {str(e)}")
 
@@ -475,7 +491,7 @@ def from_text_full_endpoint(request: dict = Body(...)):
                 "text": wt.get("title", ""),
                 "description": wt.get("description", ""),
                 "acceptance_criteria": wt.get("acceptance_criteria", ""),
-                "project_code": "",
+                "project_code": (input_task.get("project_code") or "").strip(),
                 "original_chat": original_input,
                 "manual": True,
                 "form_date": wt.get("date", ""),
@@ -707,6 +723,37 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+# ============================================================
+# GDD (Game Design Document) cache
+# Moi project co 1 file gdd/<project_code>.md (gitignored) lam
+# context cho AI khi sinh Description + AC trong tab-manual.
+# ============================================================
+gdd_cache = {}  # {project_code: content or None}
+
+def get_gdd(project_code):
+    """Load GDD tu gdd/<code>.md, cache in-memory. Tra None neu khong co file."""
+    if project_code in gdd_cache:
+        return gdd_cache[project_code]
+    gdd_dir = os.path.join(BASE_DIR, "gdd")
+    path = os.path.join(gdd_dir, f"{project_code}.md")
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                gdd_cache[project_code] = f.read()
+        except Exception:
+            gdd_cache[project_code] = None
+    else:
+        gdd_cache[project_code] = None
+    return gdd_cache[project_code]
+
+@app.get("/api/projects/{code}/gdd")
+def get_project_gdd(code: str):
+    """Tra ve GDD content cho UI debug. 404 neu khong co file."""
+    content = get_gdd(code)
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"Khong co GDD cho project '{code}'. Tao file gdd/{code}.md truoc.")
+    return Response(content=content, media_type="text/markdown; charset=utf-8")
 
 @app.get("/api/config")
 def get_config():
