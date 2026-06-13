@@ -782,6 +782,101 @@ def run_submitter_process():
         with submitter_process_lock:
             submitter_process = None
 
+@app.post("/api/run/nhapviec_manual")
+def run_nhapviec_manual():
+    """Nhap viec tu tab-manual: loc manual tasks, ghi memorytask_manual.md + tasks.json, spawn submitter."""
+    try:
+        saved_file = os.path.join(BASE_DIR, "saved_raw_tasks.json")
+        if not os.path.exists(saved_file):
+            raise HTTPException(status_code=400, detail="Khong co task nao trong saved_raw_tasks.json. Hay bam 'AI tao Task' truoc.")
+
+        try:
+            with open(saved_file, "r", encoding="utf-8") as f:
+                all_tasks = json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Khong the doc saved_raw_tasks.json: {str(e)}")
+
+        manual_tasks = [
+            t for t in all_tasks
+            if t.get("room_name") == "Thu cong" and t.get("status") != "hide"
+        ]
+        if not manual_tasks:
+            raise HTTPException(status_code=400, detail="Khong co manual task nao de nhap. Hay bam 'AI tao Task' truoc.")
+
+        missing_project = [t for t in manual_tasks if not (t.get("project_code") or "").strip()]
+        if missing_project:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Co {len(missing_project)} task chua gan project. Vui long gan project cho tat ca task truoc khi nhap viec."
+            )
+
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Ghi memorytask_manual.md (audit file)
+        md_lines = [f"# Daily Tasks Manual — {today}\n"]
+        for i, t in enumerate(manual_tasks, 1):
+            md_lines.append(f"\n## Task {i}")
+            md_lines.append(f"- **Project**: {t.get('project_code', '')}")
+            md_lines.append(f"- **Date**: {t.get('form_date') or today}")
+            md_lines.append(f"- **Title**: {t.get('text', '')}")
+            if t.get("description"):
+                md_lines.append(f"- **Description**:")
+                md_lines.append(t["description"])
+            if t.get("acceptance_criteria"):
+                md_lines.append(f"- **Acceptance Criteria**:")
+                md_lines.append(t["acceptance_criteria"])
+        manual_md = "\n".join(md_lines)
+        with open(os.path.join(BASE_DIR, "memorytask_manual.md"), "w", encoding="utf-8") as f:
+            f.write(manual_md)
+
+        # Build tasks.json cho submitter
+        tasks_for_submitter = []
+        for t in manual_tasks:
+            full_desc = t.get("description", "") or ""
+            ac = t.get("acceptance_criteria", "") or ""
+            if ac:
+                if full_desc:
+                    full_desc = f"{full_desc}\n4. Acceptance Criteria: {ac}"
+                else:
+                    full_desc = f"4. Acceptance Criteria: {ac}"
+            tasks_for_submitter.append({
+                "title": t.get("text", ""),
+                "project": t.get("project_code", ""),
+                "date": t.get("form_date") or today,
+                "status": "Done",
+                "sprint": "latest",
+                "description": full_desc,
+            })
+
+        with open(os.path.join(BASE_DIR, "tasks.json"), "w", encoding="utf-8") as f:
+            json.dump(tasks_for_submitter, f, ensure_ascii=False, indent=2)
+
+        # Reset status file
+        status_file = os.path.join(BASE_DIR, "submission_status.json")
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "status": "running",
+                "current": 0,
+                "total": len(tasks_for_submitter),
+                "msg": "Dang chuan bi nhap viec tu tab Manual...",
+            }, f, ensure_ascii=False, indent=2)
+
+        # Spawn submitter (reuse existing helper)
+        thread = threading.Thread(target=run_submitter_process, daemon=True)
+        thread.start()
+
+        return {
+            "status": "success",
+            "message": "Tien trinh nhap viec manual da duoc khoi dong.",
+            "task_count": len(tasks_for_submitter),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/run/nhapviec")
 def run_nhapviec():
     try:
