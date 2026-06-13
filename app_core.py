@@ -341,6 +341,12 @@ def from_text_endpoint(request: dict = Body(...)):
         if not tasks_input or not isinstance(tasks_input, list):
             raise HTTPException(status_code=400, detail="Thieu hoac sai dinh dang 'tasks' (can la list khong rong).")
 
+        # Filter ra task co title rong (sau strip) - tranh luu task rac
+        valid_tasks = [t for t in tasks_input if (t.get("title") or "").strip()]
+        if not valid_tasks:
+            raise HTTPException(status_code=400, detail="Tat ca cac task deu co title rong. Vui long nhap it nhat 1 title.")
+        tasks_input = valid_tasks
+
         config = load_config()
         provider = config.get("ai_provider", "openai")
         api_key = config.get("ai_key", "")

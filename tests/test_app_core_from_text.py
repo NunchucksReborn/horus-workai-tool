@@ -34,6 +34,21 @@ def test_from_text_missing_tasks_returns_400(tmp_path, monkeypatch):
     assert "tasks" in resp.json().get("detail", "").lower() or "thieu" in resp.json().get("detail", "").lower()
 
 
+def test_from_text_all_empty_titles_returns_400(tmp_path, monkeypatch):
+    """Tat ca title deu rong (sau strip) -> 400, khong luu task nao."""
+    client, base = _make_client_and_dir(tmp_path, monkeypatch)
+    resp = client.post("/api/raw_tasks/from_text", json={
+        "tasks": [
+            {"title": "", "description": "d1", "date": "2026-06-13"},
+            {"title": "   ", "description": "d2", "date": "2026-06-13"},  # whitespace only
+        ]
+    })
+    assert resp.status_code == 400
+    # Verify khong co file nao duoc tao
+    saved_file = base / "saved_raw_tasks.json"
+    assert not saved_file.exists()
+
+
 def test_from_text_empty_tasks_returns_400(tmp_path, monkeypatch):
     client, _ = _make_client_and_dir(tmp_path, monkeypatch)
     resp = client.post("/api/raw_tasks/from_text", json={"tasks": []})
