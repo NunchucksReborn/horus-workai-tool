@@ -469,11 +469,14 @@ TUYET DOI KHONG tra loi giao tiep, giai thich hoac ghi chu gi khac ngoai chuoi J
         return json.dumps(fallback, ensure_ascii=False)
 
 
-def wrap_user_tasks_full(tasks, provider, api_key, user_name="Chu Van Mai"):
+def wrap_user_tasks_full(tasks, provider, api_key, user_name="Chu Van Mai", gdd_map=None):
     """
     Mo rong cua wrap_user_tasks: sinh Title (Rule B) + Description (3 phan) + Acceptance Criteria.
     Moi task input: {"title": str, "description": str (optional), "date": "YYYY-MM-DD" (optional, default today)}.
     Tra ve JSON string array: [{"title", "description", "acceptance_criteria", "date"}]
+
+    Optional gdd_map: dict {project_code: gdd_content}. Khi co, inject vao system prompt
+    lam context giup AI sinh Description + AC sat voi du an.
 
     description format: "1. Background: <text>\n2. Objective: <text>\n3. Notes: <text>"
     acceptance_criteria format: moi line bat dau bang "1. ", "2. ", ...
@@ -489,8 +492,14 @@ def wrap_user_tasks_full(tasks, provider, api_key, user_name="Chu Van Mai"):
             "date": (t.get("date") or "").strip() or today_str,
         })
 
-    system_prompt = """Ban la tro ly ao PM.
-Nhiem vu: WRAP moi task input thanh 4 truong chuan:
+    gdd_section = ""
+    if gdd_map and isinstance(gdd_map, dict):
+        gdd_section = "\n\nBOI CANH DU AN (GDD) - Hay doc de sinh Description + AC sat voi du an:\n"
+        for code, content in gdd_map.items():
+            if content and content.strip():
+                gdd_section += f"\n=== {code} ===\n{content.strip()}\n"
+
+    system_prompt = gdd_section + """Ban la tro ly ao PM.
 1. **title**: format Rule B `[Hanh dong cu the] - [Muc tieu cu the]`, toi thieu 50 ky tu.
    Neu title qua ngan, hay mo rong bang description input.
 2. **description**: gom 3 phan, moi phan bat dau bang "1. ", "2. ", "3. " theo dung format:
