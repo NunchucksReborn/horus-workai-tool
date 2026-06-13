@@ -1,5 +1,5 @@
 {
-  "version": "1.0.30",
+  "version": "1.0.31",
   "released_at": "2026-06-14",
-  "changelog": "Tich hop buoc Tao viec + Nhap viec vao trong tab 'Nhap thu cong': AI sinh Title + Description (Background/Objective/Notes) + Acceptance Criteria; modal Chi tiet hien Description + AC; nut 'Nhap viec ngay' chay submitter luon khong can qua Tab 2/3. Submitter skip click 'Goi y bang AI' khi description da co san (tiet kiem ~45s/task)."
+  "changelog": "Them GDD (Game Design Document) context cho tab Manual: moi project co the tao file gdd/<project_code>.md (gitignored) lam context giup AI sinh Description + Acceptance Criteria sat voi du an. File row trong form manual them combobox project (bat buoc). Backend validate project_code (400 neu thieu), load GDD theo project unique, inject vao system prompt. In-memory cache, lazy load. Co the xem GDD qua GET /api/projects/{code}/gdd."
 }
