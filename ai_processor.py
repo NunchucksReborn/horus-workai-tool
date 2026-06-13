@@ -381,3 +381,89 @@ Quy tắc chung:
     if result.endswith("```"):
         result = result[:-3]
     return result.strip()
+
+
+def wrap_user_tasks(tasks, provider, api_key, user_name="Chu Van Mai"):
+    """
+    Nhan danh sach task input thu cong va dung AI wrap moi task theo Rule B.
+    Moi task input: {"title": str, "description": str (optional), "date": "YYYY-MM-DD" (optional, default today)}.
+    Tra ve JSON string array: [{"title": "...", "date": "YYYY-MM-DD"}]
+    """
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    # Default date = today neu user khong truyen
+    normalized = []
+    for t in tasks:
+        normalized.append({
+            "title": (t.get("title") or "").strip(),
+            "description": (t.get("description") or "").strip(),
+            "date": (t.get("date") or "").strip() or today_str,
+        })
+
+    system_prompt = """Ban la tro ly ao PM.
+Nhiem vu cua ban la WRAP (viet lai) title cua moi task theo dung quy tac Rule B:
+- Format: [Hanh dong cu the] - [Muc tieu cu the]
+- Do dai toi thieu 50 ky tu (neu title qua ngan, hay mo rong bang description)
+- Giu nguyen logic noi dung, chi sua de dat chuan
+
+Quy tac cu the:
+1. Neu title da >= 50 ky tu va co format tot -> giu nguyen, co the them chut mo rong neu can.
+2. Neu title < 50 ky tu va co description -> dung description de viet hanh dong va muc tieu cu the.
+3. Neu title < 50 ky tu va description rong -> tu suy ra muc tieu tu noi dung title.
+4. Giu nguyen "date" tu input, khong tu thay doi.
+
+Tra ve JSON array, moi phan tu co dang:
+{
+  "title": "title da wrap (>= 50 ky tu)",
+  "date": "YYYY-MM-DD"
+}
+
+TUYET DOI KHONG tra loi giao tiep, giai thich hoac ghi chu gi khac ngoai chuoi JSON ket qua.
+"""
+
+    user_prompt = "Danh sach task can wrap:\n\n"
+    for i, t in enumerate(normalized, 1):
+        user_prompt += f"Task #{i}:\n"
+        user_prompt += f"- Title: {t['title']}\n"
+        if t["description"]:
+            user_prompt += f"- Description: {t['description']}\n"
+        user_prompt += f"- Date: {t['date']}\n\n"
+
+    user_prompt += "Hay wrap moi task theo Rule B va tra ve JSON array (giu dung thu tu input)."
+
+    try:
+        result = call_ai_provider(provider, api_key, system_prompt, user_prompt)
+        result = result.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        elif result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+
+        parsed = json.loads(result)
+        # Validate: phai la list, moi phan tu co title + date
+        if not isinstance(parsed, list):
+            raise ValueError("AI khong tra ve list")
+        cleaned = []
+        for i, item in enumerate(parsed):
+            if not isinstance(item, dict):
+                raise ValueError(f"Phan tu {i} khong phai object")
+            title = item.get("title", "").strip()
+            date = item.get("date", "").strip() or (normalized[i]["date"] if i < len(normalized) else today_str)
+            if not title:
+                # Fallback ve title goc neu AI tra title rong
+                title = normalized[i]["title"] if i < len(normalized) else ""
+            cleaned.append({"title": title, "date": date})
+        return json.dumps(cleaned, ensure_ascii=False)
+    except Exception:
+        # Fallback: ghep title + description, giu date
+        fallback = []
+        for t in normalized:
+            merged = t["title"]
+            if t["description"] and t["description"] not in merged:
+                merged = f"{merged} - {t['description']}" if merged else t["description"]
+            fallback.append({"title": merged, "date": t["date"]})
+        return json.dumps(fallback, ensure_ascii=False)
