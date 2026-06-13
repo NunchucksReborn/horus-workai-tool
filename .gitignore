@@ -38,6 +38,10 @@ dist/
 # Scratch scripts
 scratch/
 
+# Project GDD files (per-project Game Design Document / overview)
+# AI su dung lam context khi sinh Description + AC trong tab-manual
+gdd/
+
 # Agent/IDE directories
 .claude/
 .codex/
