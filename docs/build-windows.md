@@ -1,27 +1,66 @@
 # Build Athena.exe cho Windows
 
-Tài liệu này hướng dẫn build `Athena.exe` (~50MB zip) thông qua GitHub Actions.
+Có 2 cách build: tự động qua **GitHub Actions** (cần tài khoản trả phí / repo public) hoặc **thủ công trên máy Windows** (miễn phí, dùng script tự động).
 
-## Quy trình build
+## Cách 1: Thủ công trên máy Windows (khuyến nghị — miễn phí)
 
-### Cách 1: Tự động (khuyến nghị) — khi push tag version
+### Chuẩn bị
 
-```bash
-# 1. Đảm bảo code đã được commit + push lên main
-git add . && git commit -m "Release v1.0.33"
-git push origin main
+1. **Cài Python 3.11** trên máy Windows:
+   - Tải từ https://www.python.org/downloads/
+   - **QUAN TRỌNG**: Ở bước đầu tiên, đánh dấu **"Add Python to PATH"** rồi bấm Install Now
+2. **Copy project** vào máy Windows (USB / GitHub / Zalo)
 
-# 2. Tạo tag version (format: vMAJOR.MINOR.PATCH)
-git tag v1.0.33
-git push origin v1.0.33
+### Build
 
-# 3. Đợi 5-10 phút để GitHub Actions build xong
-# 4. Vào GitHub → tab Actions → chọn workflow run "Build Windows EXE"
-# 5. Download artifact "Athena-v1.0.33.zip" ở cuối trang run
-#    HOẶC vào Releases page để thấy release mới auto-created
+1. Mở File Explorer, vào folder project
+2. **Double-click file `build-windows.bat`**
+3. Chờ script chạy ~5-10 phút (tự động cài Python deps + Playwright Chromium + build exe)
+4. Khi xong, file `dist\Athena.exe` xuất hiện trong folder project
+5. Copy `dist\Athena.exe` cho user
+
+### Cần giúp đỡ?
+
+- Xem chi tiết từng bước: [Chi tiết build thủ công](#chi-tiết-build-thủ-công)
+- Hoặc dùng GitHub Actions: [Cách 2: GitHub Actions](#cách-2-github-actions-tự-động)
+
+## Chi tiết build thủ công
+
+Nếu `build-windows.bat` gặp lỗi, bạn có thể chạy thủ công:
+
+```cmd
+REM Mở Command Prompt trong folder project
+python -m venv .venv
+.venv\Scripts\activate
+pip install fastapi "uvicorn[standard]" pywebview python-multipart "pydantic>=2" requests playwright python-dotenv httpx pyinstaller
+playwright install chromium
+
+REM Copy ms-playwright vao project root
+xcopy "%USERPROFILE%\AppData\Local\ms-playwright" "ms-playwright\" /E /I /Q /Y
+
+REM Build
+pyinstaller main.spec --noconfirm --clean
+
+REM Rename
+ren dist\main.exe Athena.exe
 ```
 
-### Cách 2: Trigger thủ công từ GitHub UI
+## Cách 2: GitHub Actions (tự động)
+
+> Cần tài khoản GitHub trả phí HOẶC repo public. Nếu gặp lỗi "account is locked due to a billing issue" thì dùng Cách 1.
+
+### Trigger build
+
+**Cách 2A — Push tag version (tự động):**
+
+```bash
+git tag v1.0.33
+git push origin v1.0.33
+```
+
+Workflow tự chạy, khi xong sẽ tự tạo GitHub Release với file `.zip` đính kèm.
+
+**Cách 2B — Trigger thủ công từ GitHub UI:**
 
 1. Vào GitHub repo → tab **Actions**
 2. Chọn workflow **"Build Windows EXE"** ở sidebar trái
