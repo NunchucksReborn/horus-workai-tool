@@ -1,0 +1,88 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install fastapi "uvicorn[standard]" pywebview python-multipart "pydantic>=2" requests playwright python-dotenv httpx pyinstaller
+
+      - name: Install Playwright Chromium
+        run: playwright install chromium
+
+      - name: Copy ms-playwright to project root
+        shell: pwsh
+        run: |
+          $src = "$env:USERPROFILE\AppData\Local\ms-playwright"
+          $dst = "ms-playwright"
+          if (Test-Path $src) {
+            if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+            Copy-Item -Path $src -Destination $dst -Recurse -Force
+            Write-Host "Copied ms-playwright from $src to $dst"
+          } else {
+            Write-Error "ms-playwright not found at $src"
+            exit 1
+          }
+
+      - name: Build with PyInstaller
+        run: pyinstaller main.spec --noconfirm
+
+      - name: Rename to Athena.exe
+        shell: pwsh
+        run: |
+          if (Test-Path "dist\Athena.exe") { Remove-Item "dist\Athena.exe" -Force }
+          if (Test-Path "dist\main.exe") { Rename-Item "dist\main.exe" "Athena.exe" }
+          if (-Not (Test-Path "dist\Athena.exe")) { Write-Error "Athena.exe not found in dist/"; exit 1 }
+          $size = (Get-Item "dist\Athena.exe").Length / 1MB
+          Write-Host "Athena.exe size: $([math]::Round($size, 1)) MB"
+
+      - name: Determine version
+        id: get_version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          } else {
+            $version = "manual-${{ github.run_number }}"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Build version: $version"
+
+      - name: Zip Athena.exe
+        shell: pwsh
+        run: |
+          $zipName = "Athena-${{ steps.get_version.outputs.VERSION }}.zip"
+          if (Test-Path $zipName) { Remove-Item $zipName -Force }
+          Compress-Archive -Path "dist\Athena.exe" -DestinationPath $zipName
+          Write-Host "Created $zipName"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Athena-${{ steps.get_version.outputs.VERSION }}
+          path: Athena-${{ steps.get_version.outputs.VERSION }}.zip
+          retention-days: 30
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Athena-${{ steps.get_version.outputs.VERSION }}.zip
+          generate_release_notes: true
