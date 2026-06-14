@@ -179,6 +179,18 @@ input:focus {
     transform: translateY(-2px);
 }
 
+/* Sidebar tool button selected state (2026-06-14) */
+.tool-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+.tool-btn.active:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
 .divider {
     height: 1px;
     background: var(--panel-border);
@@ -190,6 +202,7 @@ input:focus {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-top: 1px solid var(--panel-border);
 }
 
 .tabs {
@@ -218,7 +231,7 @@ input:focus {
 .tab-content {
     display: none;
     flex: 1;
-    padding: 20px;
+    padding: 20px 20px 15px 20px;
     overflow-y: auto;
 }
 
@@ -668,5 +681,10 @@ default cua browser => invisible. Ep background dam cho ca option. */
     color: white;
     border-color: var(--accent);
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Hide legacy menu/tab items (2026-06-14 yeu cau user, giu logic du phong) */
+.hidden-by-config {
+    display: none !important;
 }
 

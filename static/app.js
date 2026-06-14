@@ -13,6 +13,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
+    // Map tab-content panel -> sidebar button id (for active state sync, 2026-06-14)
+    const sidebarButtonMap = {
+        'tab-manual': 'btn-tool-manual',
+        'tab-suakpi': 'btn-tool-suakpi',
+    };
+
+    function switchToPanel(panelId) {
+        tabContents.forEach(c => c.classList.remove('active'));
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('active');
+
+        // Sync sidebar active state
+        document.querySelectorAll('.area-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
+        const sidebarBtnId = sidebarButtonMap[panelId];
+        if (sidebarBtnId) {
+            const sidebarBtn = document.getElementById(sidebarBtnId);
+            if (sidebarBtn) sidebarBtn.classList.add('active');
+        }
+    }
+
     // --- State ---
     let projectsList = [];
     let rawTasks = [];
@@ -22,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentProcessedFilter = 'all';
     let activePlatforms = ['rocket'];
     let processedTasksContent = '';
+    let lastActivePanel = 'tab-manual';  // Lưu panel đang xem trước khi vào Cài đặt/Modal (2026-06-14)
 
     function updateActivePlatforms(platforms) {
         activePlatforms = ['rocket'];
@@ -256,6 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-settings').addEventListener('click', () => {
+        // Lưu panel đang active trước khi vào Setup (2026-06-14)
+        const activePanel = document.querySelector('.tab-content.active')?.id;
+        if (activePanel) lastActivePanel = activePanel;
+        // Clear sidebar active (Setup không thuộc panel nào)
+        document.querySelectorAll('.area-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
         sceneMain.classList.add('hidden');
         sceneSetup.classList.remove('hidden');
     });
@@ -457,6 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 sceneSetup.classList.add('hidden');
                 sceneMain.classList.remove('hidden');
                 updateActivePlatforms(platforms);
+                // Restore sidebar active theo panel đã lưu (2026-06-14)
+                switchToPanel(lastActivePanel);
             } else {
                 alert("Lỗi lưu cấu hình");
             }
@@ -465,50 +493,126 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Tabs Logic ---
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-
-            tab.classList.add('active');
-            document.getElementById(tab.dataset.tab).classList.add('active');
-        });
-    });
+    // --- Tabs Logic removed 2026-06-14: top tab bar hidden, sidebar buttons drive panel switching via switchToPanel() ---
 
     // --- Tools Logic ---
-    document.getElementById('btn-scan-projects').addEventListener('click', async () => {
-        const btn = document.getElementById('btn-scan-projects');
-        btn.textContent = "Đang quét...";
-        // Call API
+    // --- Projects Modal Logic (rework 2026-06-14: button opens modal thay vi scan truc tiep) ---
+    const projectsModal = document.getElementById('projects-modal');
+    const projectsListEl = document.getElementById('projects-list');
+    const btnCloseProjectsModal = document.getElementById('btn-close-projects-modal');
+    const btnCancelProjectsModal = document.getElementById('btn-cancel-projects-modal');
+    const btnRescanProjects = document.getElementById('btn-rescan-projects');
+
+    function showProjectsModal() {
+        // Modal là overlay, clear sidebar active (2026-06-14)
+        document.querySelectorAll('.area-tools .tool-btn').forEach(btn => btn.classList.remove('active'));
+        projectsListEl.innerHTML = '<div class="empty-state">Đang tải danh sách dự án...</div>';
+        projectsModal.classList.remove('hidden');
+        projectsModal.style.display = 'flex';
+        loadProjectsList();
+    }
+
+    function hideProjectsModal() {
+        projectsModal.classList.add('hidden');
+        projectsModal.style.display = 'none';
+        btnRescanProjects.disabled = false;
+        btnRescanProjects.textContent = "🔄 Quét lại dự án";
+        // Restore sidebar active theo panel đang xem
+        const activePanel = document.querySelector('.tab-content.active')?.id;
+        if (activePanel) switchToPanel(activePanel);
+    }
+
+    async function loadProjectsList() {
+        try {
+            const res = await fetch('/api/projects');
+            if (res.ok) {
+                const data = await res.json();
+                projectsList = data.projects || [];
+                renderProjectsList();
+            } else {
+                projectsListEl.innerHTML = '<div class="empty-state" style="color:var(--danger)">Lỗi khi tải danh sách dự án.</div>';
+            }
+        } catch (e) {
+            projectsListEl.innerHTML = '<div class="empty-state" style="color:var(--danger)">Lỗi kết nối server.</div>';
+        }
+    }
+
+    function renderProjectsList() {
+        if (!projectsList || projectsList.length === 0) {
+            projectsListEl.innerHTML = '<div class="empty-state">Chưa có dự án nào. Bấm "🔄 Quét lại dự án" để tải từ WorkAI.</div>';
+            return;
+        }
+        projectsListEl.innerHTML = '';
+        projectsList.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'blacklist-item';
+            div.style.display = 'flex';
+            div.style.justifyContent = 'space-between';
+            div.style.alignItems = 'center';
+            div.innerHTML = `
+                <span style="flex: 1;">${escapeHtml(p.name)}</span>
+                <span class="badge" style="background: var(--accent); color: white; padding: 2px 10px; border-radius: 4px; font-size: 0.8rem; font-family: monospace;">${escapeHtml(p.code)}</span>
+            `;
+            projectsListEl.appendChild(div);
+        });
+    }
+
+    document.getElementById('btn-scan-projects').addEventListener('click', () => {
+        showProjectsModal();
+    });
+
+    btnCloseProjectsModal.addEventListener('click', hideProjectsModal);
+    btnCancelProjectsModal.addEventListener('click', hideProjectsModal);
+
+    btnRescanProjects.addEventListener('click', async () => {
+        btnRescanProjects.disabled = true;
+        const oldText = btnRescanProjects.textContent;
+        btnRescanProjects.textContent = "Đang quét...";
         try {
             const res = await fetch('/api/projects/scan');
-            if(res.ok) {
+            if (res.ok) {
                 const data = await res.json();
-                projectsList = data.projects;
+                projectsList = data.projects || [];
+                renderProjectsList();
                 alert("Đã quét được " + projectsList.length + " dự án!");
             } else {
                 const data = await res.json();
-                alert("Lỗi: " + data.detail);
+                alert("Lỗi: " + (data.detail || "không rõ"));
             }
         } catch (e) {
             alert("Lỗi khi quét dự án: " + e);
+        } finally {
+            btnRescanProjects.disabled = false;
+            btnRescanProjects.textContent = oldText;
         }
-        btn.textContent = "Làm mới Dự án WorkAI";
     });
 
     let kpiTasks = [];
+    let kpiScanned = false;
 
     document.getElementById('btn-tool-suakpi').addEventListener('click', async () => {
-        const btn = document.getElementById('btn-tool-suakpi');
-        btn.textContent = "Đang quét KPI...";
-        
         // Chuyển sang tab Sửa KPI
-        tabs.forEach(t => t.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        const kpiTab = document.querySelector('.tab-btn[data-tab="tab-suakpi"]');
-        if(kpiTab) kpiTab.classList.add('active');
-        document.getElementById('tab-suakpi').classList.add('active');
+        switchToPanel('tab-suakpi');
+
+        // Neu da scan truoc do, chi show data cached, khong quet lai
+        if (kpiScanned) {
+            renderKpiTasks();
+            return;
+        }
+
+        await scanKpiAndFix();
+    });
+
+    // --- Scan KPI: scrape + AI fix (2026-06-14: tach rieng de reuse cho btn-refresh-kpi) ---
+    async function scanKpiAndFix() {
+        const btn = document.getElementById('btn-tool-suakpi');
+        const btnRefreshKpi = document.getElementById('btn-refresh-kpi');
+        const oldRefreshText = btnRefreshKpi ? btnRefreshKpi.textContent : null;
+        if (btn) btn.textContent = "Đang quét KPI...";
+        if (btnRefreshKpi) {
+            btnRefreshKpi.disabled = true;
+            btnRefreshKpi.textContent = "Đang quét KPI...";
+        }
 
         const container = document.getElementById('kpi-tasks-container');
         container.innerHTML = `
@@ -552,6 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(res.ok) {
                 const data = await res.json();
                 kpiTasks = data.tasks;
+                kpiScanned = true;
                 renderKpiTasks();
             } else {
                 const err = await res.json();
@@ -563,8 +668,12 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Lỗi kết nối.");
             container.innerHTML = `<div class="empty-state" style="color:var(--danger)">Lỗi kết nối.</div>`;
         }
-        btn.textContent = "4. Sửa KPI";
-    });
+        if (btn) btn.textContent = "Sửa KPI";
+        if (btnRefreshKpi) {
+            btnRefreshKpi.disabled = false;
+            btnRefreshKpi.textContent = oldRefreshText || "⟲ Làm mới nội dung";
+        }
+    }
 
     function renderKpiTasks() {
         const container = document.getElementById('kpi-tasks-container');
@@ -934,8 +1043,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 overlay.style.display = 'none';
                                 overlay.classList.add('hidden');
                                 alert("Đã cập nhật KPI thành công lên WorkAI!");
-                                // Tải lại danh sách KPI để cập nhật trạng thái mới
-                                document.getElementById('btn-tool-suakpi').click();
+                                // Reload KPI từ file (preview_helper.py đã update saved_kpi_tasks.json), không cần full scan_and_fix
+                                loadKpiTasks();
                             }, 1000);
                         } else if (state === 'error') {
                             clearInterval(intervalId);
@@ -989,8 +1098,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
                 }
-                // Chuyển sang tab raw
-                document.querySelector('[data-tab="tab-raw"]').click();
+                // Chuyển sang tab raw (defensive: tab-btn có thể bị ẩn/removed)
+                const rawTab = document.querySelector('[data-tab="tab-raw"]');
+                if (rawTab) rawTab.click();
             } else {
                 const err = await res.json();
                 document.getElementById('raw-tasks-container').innerHTML = `<div class="error-text">Lỗi: ${err.detail}</div>`;
@@ -1206,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateManualSubmitState();
         loadManualResults();
         // Switch sang tab-manual
-        document.querySelector('[data-tab="tab-manual"]').click();
+        switchToPanel('tab-manual');
     });
 
     btnAddManualRow.addEventListener('click', () => addManualRow());
@@ -1342,8 +1452,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 // Render markdown content
                 document.getElementById('processed-tasks-container').innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Inter', sans-serif;">${data.content}</pre>`;
-                // Chuyển tab
-                document.querySelector('[data-tab="tab-processed"]').click();
+                // Chuyển tab (defensive: tab-btn có thể bị ẩn/removed)
+                const processedTab = document.querySelector('[data-tab="tab-processed"]');
+                if (processedTab) processedTab.click();
             } else {
                 const err = await res.json();
                 document.getElementById('processed-tasks-container').innerHTML = `<div class="error-text">Lỗi: ${err.detail}</div>`;
@@ -1635,11 +1746,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(btnRefreshKpi) {
         btnRefreshKpi.addEventListener('click', async () => {
-            btnRefreshKpi.textContent = "Đang tải...";
-            btnRefreshKpi.disabled = true;
-            await loadKpiTasks();
-            btnRefreshKpi.textContent = "⟲ Làm mới nội dung";
-            btnRefreshKpi.disabled = false;
+            // 2026-06-14: "Làm mới nội dung" -> rescan (scan_and_fix), không chỉ đọc file
+            await scanKpiAndFix();
         });
     }
 
@@ -1648,10 +1756,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSendChat = document.getElementById('btn-send-chat');
     const chatMessages = document.getElementById('chat-messages');
 
-    btnSendChat.addEventListener('click', sendChatMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if(e.key === 'Enter') sendChatMessage();
-    });
+    // Defensive: chat UI bị comment-out trong HTML, các element có thể null
+    if (btnSendChat && chatInput) {
+        btnSendChat.addEventListener('click', sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') sendChatMessage();
+        });
+    }
 
     async function sendChatMessage() {
         const text = chatInput.value.trim();
@@ -1923,4 +2034,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Default init: tab-manual active khi load trang (2026-06-14)
+    switchToPanel('tab-manual');
 });

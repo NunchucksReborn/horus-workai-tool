@@ -1,0 +1,110 @@
+[
+  {
+    "issue_key": "GAE-2298",
+    "title": "Giới hạn số lượng vũ khí tối đa người chơi có thể nhặt trong mỗi gate/run và đảm bảo cơ chế merge vũ khí mạnh vẫn hoạt động chính xác - Để tránh tình trạng tích trữ quá nhiều vũ khí gây mất cân bằng",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1682",
+    "title": "Xây dựng tài liệu thiết kế (GDD) chi tiết cho Hero Kunkka - Để định hình phong cách chiến đấu, thiết kế bộ 6 kỹ năng, xây dựng luồng logic tương tác và bảng thông số cân bằng cho Hero",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1678",
+    "title": "Tối ưu hóa VFX kỹ năng Break Ground của Hero Axe Tempest - Để tăng cảm giác va chạm và đảm bảo hiệu năng trên mobile, đồng thời tinh chỉnh các hiệu ứng hình ảnh cho chân thực và mượt mà",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1907",
+    "title": "Up Android 33 và cập nhật phiên bản 0.0.1.7 lên hệ thống - Để đảm bảo tương thích với các yêu cầu mới nhất từ Google Play và khắc phục các lỗi liên quan đến target API",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1546",
+    "title": "Kiểm tra và xác thực tính toàn vẹn UI/UX cùng logic vận hành của hệ thống Pet - Để phát hiện lỗi giao diện và đảm bảo trải nghiệm người dùng mượt mà trước khi phát hành",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1957",
+    "title": "Phân tích trải nghiệm (Playtest & Deconstruct) game đối thủ và lập báo cáo đề xuất tính năng mới - Để tìm kiếm ý tưởng cải tiến cho dự án dựa trên phân tích chuyên sâu cơ chế game",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1955",
+    "title": "Tracking và phân tích dữ liệu người dùng trên nền tảng Android phiên bản 0.0.1.7 - Để đánh giá hiệu năng, phát hiện lỗi và đưa ra các đề xuất cải thiện trải nghiệm",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1956",
+    "title": "Phân loại, xử lý phản hồi người chơi từ mail support và tổng hợp dữ liệu tối ưu hóa sản phẩm - Để giải quyết các vấn đề kỹ thuật và cải thiện chất lượng game dựa trên feedback thực tế",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1679",
+    "title": "Rà soát và kiểm thử toàn diện hệ thống Mount: Kiểm tra UI/UX, logic vận hành và tổng hợp tài liệu chỉnh sửa - Để đảm bảo tính năng hoạt động ổn định và đúng thiết kế",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1680",
+    "title": "Thiết kế mẫu UI Main Menu với bố cục trực quan và dễ sử dụng - Để định hình phong cách giao diện chính của game trên tất cả các nền tảng",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GCR-4048",
+    "title": "Sử dụng AI thiết kế và hậu kỳ bộ Icon Hero, Skill và Wheel cho 2 nhân vật mới - Để đảm bảo bộ icon đạt chuẩn UI/UX và đồng bộ với phong cách game",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1683",
+    "title": "Xây dựng tài liệu VFX Brief và kiểm chứng hiệu năng kỹ năng Thả thuyền của Hero Kunkka - Để hướng dẫn đội ngũ phát triển và đảm bảo hiệu ứng hoạt động mượt mà trên thiết bị thực tế",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GCR-4049",
+    "title": "Cấu hình dữ liệu, tích hợp tài nguyên và thiết lập hiển thị UI cho 2 Hero mới trên vòng quay - Để đảm bảo thông tin Hero hiển thị chính xác và đầy đủ trong hệ thống game",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GCR-4113",
+    "title": "Kiểm thử và cân bằng tính năng Xem Ads nhận Hero và Hero Trial - Để đảm bảo tính ổn định và cân bằng của cơ chế cho cả hai tính năng trong game",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GCR-3929",
+    "title": "Kiểm thử Final Smoke Test, chuẩn bị Metadata và submit bản build 0.0.1.5 lên App Store - Để đảm bảo phiên bản đáp ứng đủ điều kiện duyệt và không có lỗi nghiêm trọng",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1950",
+    "title": "Thiết kế hệ thống Live Ops Đổi Thưởng: Logic vận hành, cơ chế tiền tệ trung gian và cấu trúc Exchange Shop - Để tạo ra hệ thống sự kiện hấp dẫn giữ chân người chơi",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1904",
+    "title": "Chuẩn hóa hệ thống tính toán sát thương kỹ năng (DoT, AoE, Multi-hit) và đồng bộ hóa dữ liệu hiển thị Damage Popup - Để sửa lỗi logic damage sai và đảm bảo tính nhất quán trong gameplay",
+    "description": null,
+    "acceptance_criteria": null
+  },
+  {
+    "issue_key": "GAE-1906",
+    "title": "Tái cân bằng HP Gate, Tower và kinh tế trong trận cho các Timeline sau khi cập nhật logic tính Damage mới - Để đảm bảo độ khó phù hợp và trải nghiệm chơi mượt mà cho người dùng",
+    "description": null,
+    "acceptance_criteria": null
+  }
+]
